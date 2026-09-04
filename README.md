@@ -7,7 +7,7 @@
 
 [![macOS](https://img.shields.io/badge/macOS-14.0%2B-black?style=flat&logo=apple)](https://apple.com)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange?style=flat&logo=swift)](https://swift.org)
-[![Download](https://img.shields.io/badge/Download-Luna.zip-blue.svg)](./dist/Luna.zip?raw=true)
+[![Download](https://img.shields.io/badge/Download-Luna.zip-blue.svg)](https://github.com/nimitbhargava/luna-screen-recorder/releases/latest/download/Luna.zip)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -18,10 +18,10 @@
 
 Don't want to build from source? Download the pre-built, ready-to-use macOS app directly:
 
-👉 **[Download Luna.zip (macOS App)](./dist/Luna.zip?raw=true)** *(~2.8 MB)*
+👉 **[Download Luna.zip (macOS App)](https://github.com/nimitbhargava/luna-screen-recorder/releases/latest/download/Luna.zip)** *(~6 MB, Universal macOS)*
 
 1. Download and unzip `Luna.zip`.
-2. Move **`Luna.app`** into your `/Applications` folder.
+2. Move **`Luna - Screen Recorder.app`** into your `/Applications` folder.
 3. Open it — Luna lives in your menu bar, ready to record!
 
 ---
