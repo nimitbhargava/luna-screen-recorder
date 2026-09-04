@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# SwiftPM
+.build/
+Packages/
+Package.resolved
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# App Bundles
+*.app/
+
+# Recordings and Media
+*.mp4
+*.mov
+*.gif
+
+# Temp & Cache
+.cache/
+*.swp
+*~
