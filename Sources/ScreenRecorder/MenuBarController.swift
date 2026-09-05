@@ -416,13 +416,21 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 // Copy file path directly to clipboard if enabled (ideal for LLMs & AI coding agents)
                 if RetentionManager.shared.isAutoCopyPathEnabled {
                     PasteboardManager.shared.copyPathToPasteboard(fileURL: outputURL)
+                    ToastHUDController.shared.show(
+                        title: "Recording URL Copied",
+                        message: "Ready to paste (⌘V) into your LLM",
+                        fileURL: outputURL
+                    )
+                } else {
+                    ToastHUDController.shared.show(
+                        title: "Recording Saved",
+                        message: "Saved to your library",
+                        fileURL: outputURL
+                    )
                 }
                 
                 // Prune old recordings (15 days if enabled)
                 RetentionManager.shared.pruneOldRecordings()
-                
-                // Show post-recording UI with list and copy options
-                RecordingsWindowController.shared.show(with: outputURL)
                 
                 // Send system notification
                 let sizeStr = RetentionManager.formattedFileSize(for: outputURL)
@@ -514,10 +522,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     
     private func showSuccessNotification(filename: String, size: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Luna 🌙: Recording Finished!"
+        content.title = "Luna 🌙: Recording URL Copied!"
         content.subtitle = "\(filename) (\(size))"
         if RetentionManager.shared.isAutoCopyPathEnabled {
-            content.body = "File path copied to clipboard for your LLM (⌘V)."
+            content.body = "Recording URL is now in your clipboard and ready to be pasted (⌘V)."
         } else {
             content.body = "Recording saved to your library."
         }
