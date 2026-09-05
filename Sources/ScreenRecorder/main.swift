@@ -39,7 +39,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         recentsItem.target = self
         menu.addItem(recentsItem)
         
-        let onboardingItem = NSMenuItem(title: "Welcome & Settings...", action: #selector(dockOpenOnboarding), keyEquivalent: "")
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(dockOpenSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        let onboardingItem = NSMenuItem(title: "Welcome Guide...", action: #selector(dockOpenOnboarding), keyEquivalent: "")
         onboardingItem.target = self
         menu.addItem(onboardingItem)
         
@@ -60,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func dockOpenRecents() {
         RecordingsWindowController.shared.show()
+    }
+    
+    @objc private func dockOpenSettings() {
+        SettingsWindowController.shared.show()
     }
     
     @objc private func dockOpenOnboarding() {

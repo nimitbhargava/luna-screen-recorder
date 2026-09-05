@@ -3,21 +3,17 @@ import AppKit
 public final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     public static let shared = OnboardingWindowController()
     
-    private var card1: NSBox!
-    private var card2: NSBox!
-    private var autoDeleteRadio: NSButton!
-    private var keepForeverRadio: NSButton!
-    private var copyPathCard: NSBox!
     private var copyPathSwitch: NSSwitch!
+    private var autoDeleteSwitch: NSSwitch!
     
     public init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 650),
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 580),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Welcome to Luna 🌙"
+        window.title = "Welcome to Luna"
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
@@ -29,12 +25,8 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
     }
     
     public func show() {
-        let isAutoDelete = RetentionManager.shared.isAutoDeleteEnabled
-        autoDeleteRadio?.state = isAutoDelete ? .on : .off
-        keepForeverRadio?.state = isAutoDelete ? .off : .on
         copyPathSwitch?.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
-        updateCardStyles()
-        updateToggleCardStyle()
+        autoDeleteSwitch?.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
         
         window?.center()
         window?.makeKeyAndOrderFront(nil)
@@ -47,8 +39,8 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         root.autoresizingMask = [.width, .height]
         
         // --- 1. HEADER: Mascot & Welcome Titles ---
-        let mascotSize: CGFloat = 88
-        let mascotImageView = NSImageView(frame: NSRect(x: (root.frame.width - mascotSize) / 2, y: root.frame.height - 115, width: mascotSize, height: mascotSize))
+        let mascotSize: CGFloat = 80
+        let mascotImageView = NSImageView(frame: NSRect(x: (root.frame.width - mascotSize) / 2, y: root.frame.height - 105, width: mascotSize, height: mascotSize))
         mascotImageView.imageScaling = .scaleProportionallyUpOrDown
         if let mascotImg = loadMascotImage() {
             mascotImageView.image = mascotImg
@@ -56,147 +48,113 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         root.addSubview(mascotImageView)
         
         let titleLabel = NSTextField(labelWithString: "Welcome to Luna")
-        titleLabel.frame = NSRect(x: 20, y: root.frame.height - 150, width: root.frame.width - 40, height: 28)
+        titleLabel.frame = NSRect(x: 20, y: root.frame.height - 140, width: root.frame.width - 40, height: 28)
         titleLabel.font = NSFont.systemFont(ofSize: 22, weight: .bold)
         titleLabel.alignment = .center
         root.addSubview(titleLabel)
         
-        let subtitleLabel = NSTextField(labelWithString: "Crisp, lightweight screen recording tailored for AI coding workflows.")
-        subtitleLabel.frame = NSRect(x: 30, y: root.frame.height - 176, width: root.frame.width - 60, height: 20)
+        let subtitleLabel = NSTextField(labelWithString: "Lightweight, crisp screen recording tailored for AI coding workflows.")
+        subtitleLabel.frame = NSRect(x: 30, y: root.frame.height - 166, width: root.frame.width - 60, height: 20)
         subtitleLabel.font = NSFont.systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabelColor
         subtitleLabel.alignment = .center
         root.addSubview(subtitleLabel)
         
-        // Section Header
-        let prefSectionHeader = NSTextField(labelWithString: "STORAGE & RETENTION")
-        prefSectionHeader.frame = NSRect(x: 38, y: root.frame.height - 212, width: root.frame.width - 76, height: 16)
-        prefSectionHeader.font = NSFont.systemFont(ofSize: 11, weight: .bold)
-        prefSectionHeader.textColor = .secondaryLabelColor
-        root.addSubview(prefSectionHeader)
+        // --- 2. APPLE-STYLE INSET GROUPED SETTINGS ---
+        let sectionHeader = NSTextField(labelWithString: "DEFAULT WORKFLOW SETTINGS")
+        sectionHeader.frame = NSRect(x: 38, y: root.frame.height - 200, width: root.frame.width - 76, height: 16)
+        sectionHeader.font = NSFont.systemFont(ofSize: 11, weight: .bold)
+        sectionHeader.textColor = .secondaryLabelColor
+        root.addSubview(sectionHeader)
         
-        // --- 2. APPLE-STYLE SELECTION CARDS ---
         let cardWidth = root.frame.width - 72
-        let cardHeight: CGFloat = 72
+        let groupContainer = NSBox(frame: NSRect(x: 36, y: root.frame.height - 430, width: cardWidth, height: 224))
+        groupContainer.boxType = .custom
+        groupContainer.cornerRadius = 12
+        groupContainer.fillColor = NSColor.controlBackgroundColor.withAlphaComponent(0.65)
+        groupContainer.borderColor = NSColor.separatorColor.withAlphaComponent(0.35)
+        groupContainer.borderWidth = 1.0
         
-        // Card 1: 15-Day Auto-Delete (Recommended)
-        card1 = NSBox(frame: NSRect(x: 36, y: root.frame.height - 296, width: cardWidth, height: cardHeight))
-        card1.boxType = .custom
-        card1.cornerRadius = 10
-        card1.borderWidth = 1.5
+        // ROW 1: Auto-Copy Path for LLMs
+        let row1Y: CGFloat = 120
+        let icon1 = NSImageView(frame: NSRect(x: 16, y: row1Y + 54, width: 24, height: 24))
+        icon1.image = NSImage(systemSymbolName: "link.circle.fill", accessibilityDescription: nil)
+        icon1.contentTintColor = .controlAccentColor
+        groupContainer.addSubview(icon1)
         
-        let card1Icon = NSImageView(frame: NSRect(x: 14, y: 24, width: 24, height: 24))
-        card1Icon.image = NSImage(systemSymbolName: "trash.badge.clock", accessibilityDescription: nil)
-        card1Icon.contentTintColor = .controlAccentColor
-        card1.addSubview(card1Icon)
+        let title1 = NSTextField(labelWithString: "Auto-Copy File Location on Stop")
+        title1.frame = NSRect(x: 48, y: row1Y + 56, width: 220, height: 18)
+        title1.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+        groupContainer.addSubview(title1)
         
-        let radio1 = NSButton(radioButtonWithTitle: "Enable 15-Day Auto-Delete", target: self, action: #selector(autoDeleteRadioClicked))
-        radio1.frame = NSRect(x: 46, y: 40, width: 230, height: 22)
-        radio1.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        card1.addSubview(radio1)
-        self.autoDeleteRadio = radio1
+        let badge1 = createBadge(text: "RECOMMENDED FOR LLMs", color: .controlAccentColor)
+        badge1.frame = NSRect(x: 272, y: row1Y + 57, width: 140, height: 16)
+        groupContainer.addSubview(badge1)
         
-        // Recommended Badge Pill
-        let recBadge = NSTextField(labelWithString: " RECOMMENDED ")
-        recBadge.frame = NSRect(x: 278, y: 43, width: 106, height: 16)
-        recBadge.font = NSFont.systemFont(ofSize: 9, weight: .bold)
-        recBadge.textColor = .controlAccentColor
-        recBadge.wantsLayer = true
-        recBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
-        recBadge.layer?.cornerRadius = 4
-        recBadge.layer?.masksToBounds = true
-        card1.addSubview(recBadge)
+        copyPathSwitch = NSSwitch(frame: NSRect(x: cardWidth - 54, y: row1Y + 52, width: 40, height: 24))
+        copyPathSwitch.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
+        copyPathSwitch.target = self
+        copyPathSwitch.action = #selector(copyPathSwitchToggled)
+        groupContainer.addSubview(copyPathSwitch)
         
-        let card1Desc = NSTextField(labelWithString: "Automatically deletes recordings older than 15 days to keep your disk clean. Ideal for throwaway AI bug demos.")
-        card1Desc.frame = NSRect(x: 48, y: 10, width: cardWidth - 62, height: 28)
-        card1Desc.font = NSFont.systemFont(ofSize: 11)
-        card1Desc.textColor = .secondaryLabelColor
-        card1.addSubview(card1Desc)
+        let desc1 = NSTextField(wrappingLabelWithString: "Automatically copies the local file path to your clipboard when recording stops. Simply press ⌘V in Antigravity, Claude, ChatGPT, or Gemini for instant analysis.")
+        desc1.frame = NSRect(x: 48, y: row1Y + 4, width: cardWidth - 105, height: 46)
+        desc1.font = NSFont.systemFont(ofSize: 11.5)
+        desc1.textColor = .secondaryLabelColor
+        groupContainer.addSubview(desc1)
         
-        let click1 = NSClickGestureRecognizer(target: self, action: #selector(autoDeleteRadioClicked))
-        card1.addGestureRecognizer(click1)
-        root.addSubview(card1)
+        // Divider
+        let divider = NSBox(frame: NSRect(x: 16, y: 112, width: cardWidth - 32, height: 1))
+        divider.boxType = .separator
+        groupContainer.addSubview(divider)
         
-        // Card 2: Keep All Recordings Forever
-        card2 = NSBox(frame: NSRect(x: 36, y: root.frame.height - 380, width: cardWidth, height: cardHeight))
-        card2.boxType = .custom
-        card2.cornerRadius = 10
-        card2.borderWidth = 1.0
+        // ROW 2: 15-Day Auto-Delete
+        let row2Y: CGFloat = 8
+        let icon2 = NSImageView(frame: NSRect(x: 16, y: row2Y + 56, width: 24, height: 24))
+        icon2.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: nil)
+        icon2.contentTintColor = .systemOrange
+        groupContainer.addSubview(icon2)
         
-        let card2Icon = NSImageView(frame: NSRect(x: 14, y: 24, width: 24, height: 24))
-        card2Icon.image = NSImage(systemSymbolName: "archivebox", accessibilityDescription: nil)
-        card2Icon.contentTintColor = .secondaryLabelColor
-        card2.addSubview(card2Icon)
+        let title2 = NSTextField(labelWithString: "15-Day Auto-Delete Old Recordings")
+        title2.frame = NSRect(x: 48, y: row2Y + 58, width: 236, height: 18)
+        title2.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+        groupContainer.addSubview(title2)
         
-        let radio2 = NSButton(radioButtonWithTitle: "Keep All Recordings Forever", target: self, action: #selector(keepForeverRadioClicked))
-        radio2.frame = NSRect(x: 46, y: 40, width: 260, height: 22)
-        radio2.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        card2.addSubview(radio2)
-        self.keepForeverRadio = radio2
+        let badge2 = createBadge(text: "RECOMMENDED", color: .systemOrange)
+        badge2.frame = NSRect(x: 288, y: row2Y + 59, width: 94, height: 16)
+        groupContainer.addSubview(badge2)
         
-        let card2Desc = NSTextField(labelWithString: "Never deletes recordings automatically. You can manually prune or delete them whenever you want.")
-        card2Desc.frame = NSRect(x: 48, y: 10, width: cardWidth - 62, height: 28)
-        card2Desc.font = NSFont.systemFont(ofSize: 11)
-        card2Desc.textColor = .secondaryLabelColor
-        card2.addSubview(card2Desc)
+        autoDeleteSwitch = NSSwitch(frame: NSRect(x: cardWidth - 54, y: row2Y + 54, width: 40, height: 24))
+        autoDeleteSwitch.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
+        autoDeleteSwitch.target = self
+        autoDeleteSwitch.action = #selector(autoDeleteSwitchToggled)
+        groupContainer.addSubview(autoDeleteSwitch)
         
-        let click2 = NSClickGestureRecognizer(target: self, action: #selector(keepForeverRadioClicked))
-        card2.addGestureRecognizer(click2)
-        root.addSubview(card2)
+        let desc2 = NSTextField(wrappingLabelWithString: "Automatically removes recordings older than 15 days to keep your disk clean. Perfect for temporary AI bug demos. Can be turned off anytime.")
+        desc2.frame = NSRect(x: 48, y: row2Y + 6, width: cardWidth - 105, height: 46)
+        desc2.font = NSFont.systemFont(ofSize: 11.5)
+        desc2.textColor = .secondaryLabelColor
+        groupContainer.addSubview(desc2)
         
-        // --- 3. AUTO-COPY LOCATION FOR LLMs TOGGLE CARD ---
-        let toggleBox = NSBox(frame: NSRect(x: 36, y: root.frame.height - 502, width: cardWidth, height: 104))
-        toggleBox.boxType = .custom
-        toggleBox.cornerRadius = 10
-        self.copyPathCard = toggleBox
+        root.addSubview(groupContainer)
         
-        let toggleIcon = NSImageView(frame: NSRect(x: 14, y: toggleBox.frame.height - 34, width: 22, height: 22))
-        toggleIcon.image = NSImage(systemSymbolName: "link.circle.fill", accessibilityDescription: nil)
-        toggleIcon.contentTintColor = .controlAccentColor
-        toggleBox.addSubview(toggleIcon)
-        
-        let toggleHeader = NSTextField(labelWithString: "Auto-Copy File Location on Stop")
-        toggleHeader.frame = NSRect(x: 44, y: toggleBox.frame.height - 32, width: 226, height: 18)
-        toggleHeader.font = NSFont.systemFont(ofSize: 13, weight: .bold)
-        toggleBox.addSubview(toggleHeader)
-        
-        // Recommended Badge Pill
-        let llmBadge = NSTextField(labelWithString: " RECOMMENDED FOR LLMs ")
-        llmBadge.frame = NSRect(x: 274, y: toggleBox.frame.height - 31, width: 148, height: 16)
-        llmBadge.font = NSFont.systemFont(ofSize: 9, weight: .bold)
-        llmBadge.textColor = .controlAccentColor
-        llmBadge.wantsLayer = true
-        llmBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
-        llmBadge.layer?.cornerRadius = 4
-        llmBadge.layer?.masksToBounds = true
-        toggleBox.addSubview(llmBadge)
-        
-        // NSSwitch toggle control (default ON)
-        let switchControl = NSSwitch(frame: NSRect(x: toggleBox.frame.width - 54, y: toggleBox.frame.height - 35, width: 40, height: 22))
-        switchControl.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
-        switchControl.target = self
-        switchControl.action = #selector(copyPathSwitchToggled)
-        toggleBox.addSubview(switchControl)
-        self.copyPathSwitch = switchControl
-        
-        let toggleBody = NSTextField(wrappingLabelWithString: "When recording stops, Luna automatically copies the local file path to your clipboard. Simply press ⌘V in your LLM (Antigravity, Claude, ChatGPT, Gemini) for instant multimodal analysis!")
-        toggleBody.frame = NSRect(x: 44, y: 12, width: toggleBox.frame.width - 60, height: 52)
-        toggleBody.font = NSFont.systemFont(ofSize: 11.5)
-        toggleBody.textColor = .secondaryLabelColor
-        toggleBox.addSubview(toggleBody)
-        
-        root.addSubview(toggleBox)
-        
-        // --- 4. SHORTCUTS SUMMARY ---
-        let shortcutsLbl = NSTextField(labelWithString: "Shortcuts:  ⌘⌥1 Area Crop  •  ⌘⌥2 Window Picker  •  ⌘⌥3 Full Screen  •  ⌘⌥S Stop")
-        shortcutsLbl.frame = NSRect(x: 20, y: 64, width: root.frame.width - 40, height: 18)
-        shortcutsLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
+        // --- 3. SHORTCUTS & HINT ---
+        let shortcutsLbl = NSTextField(labelWithString: "Shortcuts:   ⌘⌥1 Area Crop   •   ⌘⌥2 Window   •   ⌘⌥3 Display   •   ⌘⌥S Stop")
+        shortcutsLbl.frame = NSRect(x: 20, y: 78, width: root.frame.width - 40, height: 18)
+        shortcutsLbl.font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
         shortcutsLbl.textColor = .tertiaryLabelColor
         shortcutsLbl.alignment = .center
         root.addSubview(shortcutsLbl)
         
-        // --- 5. GET STARTED BUTTON ---
-        let getStartedBtn = NSButton(frame: NSRect(x: (root.frame.width - 220) / 2, y: 18, width: 220, height: 36))
+        let settingsHint = NSTextField(labelWithString: "You can change these anytime in Menu Bar > Settings... (⌘,)")
+        settingsHint.frame = NSRect(x: 20, y: 58, width: root.frame.width - 40, height: 16)
+        settingsHint.font = NSFont.systemFont(ofSize: 10.5)
+        settingsHint.textColor = .tertiaryLabelColor
+        settingsHint.alignment = .center
+        root.addSubview(settingsHint)
+        
+        // --- 4. GET STARTED BUTTON ---
+        let getStartedBtn = NSButton(frame: NSRect(x: (root.frame.width - 200) / 2, y: 16, width: 200, height: 34))
         getStartedBtn.title = "Get Started"
         getStartedBtn.image = NSImage(systemSymbolName: "arrow.right", accessibilityDescription: nil)
         getStartedBtn.imagePosition = .imageTrailing
@@ -209,42 +167,18 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         root.addSubview(getStartedBtn)
         
         window.contentView = root
-        updateCardStyles()
-        updateToggleCardStyle()
     }
     
-    private func updateCardStyles() {
-        let isAutoDelete = (autoDeleteRadio.state == .on)
-        if isAutoDelete {
-            card1.borderColor = NSColor.controlAccentColor
-            card1.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.06)
-            card1.borderWidth = 1.5
-            
-            card2.borderColor = NSColor.separatorColor.withAlphaComponent(0.4)
-            card2.fillColor = NSColor.controlBackgroundColor.withAlphaComponent(0.4)
-            card2.borderWidth = 1.0
-        } else {
-            card1.borderColor = NSColor.separatorColor.withAlphaComponent(0.4)
-            card1.fillColor = NSColor.controlBackgroundColor.withAlphaComponent(0.4)
-            card1.borderWidth = 1.0
-            
-            card2.borderColor = NSColor.controlAccentColor
-            card2.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.06)
-            card2.borderWidth = 1.5
-        }
-    }
-    
-    private func updateToggleCardStyle() {
-        let isEnabled = (copyPathSwitch?.state == .on)
-        if isEnabled {
-            copyPathCard?.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.06)
-            copyPathCard?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.35)
-            copyPathCard?.borderWidth = 1.2
-        } else {
-            copyPathCard?.fillColor = NSColor.controlBackgroundColor.withAlphaComponent(0.4)
-            copyPathCard?.borderColor = NSColor.separatorColor.withAlphaComponent(0.3)
-            copyPathCard?.borderWidth = 1.0
-        }
+    private func createBadge(text: String, color: NSColor) -> NSTextField {
+        let badge = NSTextField(labelWithString: " \(text) ")
+        badge.font = NSFont.systemFont(ofSize: 9, weight: .bold)
+        badge.textColor = color
+        badge.wantsLayer = true
+        badge.layer?.backgroundColor = color.withAlphaComponent(0.16).cgColor
+        badge.layer?.cornerRadius = 4
+        badge.layer?.masksToBounds = true
+        badge.alignment = .center
+        return badge
     }
     
     private func loadMascotImage() -> NSImage? {
@@ -259,32 +193,19 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         return NSApp.applicationIconImage
     }
     
-    @objc private func autoDeleteRadioClicked() {
-        autoDeleteRadio.state = .on
-        keepForeverRadio.state = .off
-        updateCardStyles()
-    }
-    
-    @objc private func keepForeverRadioClicked() {
-        autoDeleteRadio.state = .off
-        keepForeverRadio.state = .on
-        updateCardStyles()
-    }
-    
     @objc private func copyPathSwitchToggled() {
-        let isEnabled = (copyPathSwitch.state == .on)
-        RetentionManager.shared.isAutoCopyPathEnabled = isEnabled
-        updateToggleCardStyle()
+        RetentionManager.shared.isAutoCopyPathEnabled = (copyPathSwitch.state == .on)
+    }
+    
+    @objc private func autoDeleteSwitchToggled() {
+        RetentionManager.shared.isAutoDeleteEnabled = (autoDeleteSwitch.state == .on)
     }
     
     @objc private func getStartedClicked() {
-        let shouldAutoDelete = (autoDeleteRadio.state == .on)
-        let shouldCopyPath = (copyPathSwitch.state == .on)
-        RetentionManager.shared.isAutoDeleteEnabled = shouldAutoDelete
-        RetentionManager.shared.isAutoCopyPathEnabled = shouldCopyPath
+        RetentionManager.shared.isAutoCopyPathEnabled = (copyPathSwitch.state == .on)
+        RetentionManager.shared.isAutoDeleteEnabled = (autoDeleteSwitch.state == .on)
         RetentionManager.shared.hasCompletedOnboarding = true
-        
         window?.orderOut(nil)
-        print("[Onboarding] Completed. Auto-delete: \(shouldAutoDelete), Auto-copy path: \(shouldCopyPath)")
+        print("[Onboarding] Finished. AutoCopy: \(RetentionManager.shared.isAutoCopyPathEnabled), AutoDelete: \(RetentionManager.shared.isAutoDeleteEnabled)")
     }
 }

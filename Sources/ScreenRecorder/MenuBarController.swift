@@ -179,7 +179,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        let welcomeItem = NSMenuItem(title: "Welcome & Onboarding...", action: #selector(showOnboarding), keyEquivalent: "")
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        menu.addItem(settingsItem)
+        
+        let welcomeItem = NSMenuItem(title: "Welcome Guide...", action: #selector(showOnboarding), keyEquivalent: "")
         welcomeItem.target = self
         welcomeItem.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)
         menu.addItem(welcomeItem)
@@ -474,6 +479,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleAutoCopyPath() {
         RetentionManager.shared.isAutoCopyPathEnabled.toggle()
         autoCopyPathToggleItem.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
+    }
+    
+    @objc private func showSettings() {
+        SettingsWindowController.shared.show()
     }
     
     @objc private func showOnboarding() {
