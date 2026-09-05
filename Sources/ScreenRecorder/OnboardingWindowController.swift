@@ -25,7 +25,6 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
     }
     
     public func show() {
-        // Dismiss settings window so they never stack
         SettingsWindowController.shared.window?.orderOut(nil)
         
         copyPathSwitch?.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
@@ -66,6 +65,7 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         // --- 2. APPLE-STYLE INSET GROUPED SETTINGS ---
         let leftMargin: CGFloat = 28
         let boxWidth: CGFloat = root.frame.width - (leftMargin * 2) // 504
+        let innerPadding: CGFloat = 20
         
         let sectionHeader = NSTextField(labelWithString: "DEFAULT WORKFLOW PREFERENCES")
         sectionHeader.frame = NSRect(x: leftMargin, y: root.frame.height - 198, width: boxWidth, height: 16)
@@ -81,52 +81,55 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         groupContainer.borderWidth = 1.0
         
         // ROW 1: Auto-Copy Path for LLMs
-        let icon1 = NSImageView(frame: NSRect(x: 16, y: 174, width: 24, height: 24))
+        // Centerline y = 178
+        let icon1 = NSImageView(frame: NSRect(x: innerPadding, y: 166, width: 24, height: 24))
         icon1.image = NSImage(systemSymbolName: "link.circle.fill", accessibilityDescription: nil)
         icon1.contentTintColor = .controlAccentColor
         groupContainer.addSubview(icon1)
         
         let title1 = NSTextField(labelWithString: "Auto-Copy File Location on Stop")
-        title1.frame = NSRect(x: 50, y: 176, width: 380, height: 20)
+        title1.frame = NSRect(x: innerPadding + 34, y: 168, width: boxWidth - innerPadding * 2 - 80, height: 20)
         title1.font = NSFont.systemFont(ofSize: 13, weight: .bold)
         groupContainer.addSubview(title1)
         
-        copyPathSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54, y: 174, width: 40, height: 24))
+        // Generous right padding: boxWidth - 54 (switch width) - innerPadding (20)
+        copyPathSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54 - innerPadding, y: 166, width: 54, height: 24))
         copyPathSwitch.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
         copyPathSwitch.target = self
         copyPathSwitch.action = #selector(copyPathSwitchToggled)
         groupContainer.addSubview(copyPathSwitch)
         
         let desc1 = NSTextField(wrappingLabelWithString: "When recording stops, Luna automatically copies the local file path to your clipboard. Simply press ⌘V in Antigravity, Claude, ChatGPT, or Gemini for instant analysis.")
-        desc1.frame = NSRect(x: 50, y: 126, width: boxWidth - 66, height: 42)
+        desc1.frame = NSRect(x: innerPadding + 34, y: 118, width: boxWidth - innerPadding * 2 - 34, height: 42)
         desc1.font = NSFont.systemFont(ofSize: 11.5)
         desc1.textColor = .secondaryLabelColor
         groupContainer.addSubview(desc1)
         
         // Divider
-        let divider = NSBox(frame: NSRect(x: 16, y: 114, width: boxWidth - 32, height: 1))
+        let divider = NSBox(frame: NSRect(x: innerPadding, y: 106, width: boxWidth - innerPadding * 2, height: 1))
         divider.boxType = .separator
         groupContainer.addSubview(divider)
         
         // ROW 2: 15-Day Auto-Delete
-        let icon2 = NSImageView(frame: NSRect(x: 16, y: 68, width: 24, height: 24))
+        // Centerline y = 72
+        let icon2 = NSImageView(frame: NSRect(x: innerPadding, y: 60, width: 24, height: 24))
         icon2.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: nil)
         icon2.contentTintColor = .systemOrange
         groupContainer.addSubview(icon2)
         
         let title2 = NSTextField(labelWithString: "15-Day Auto-Delete Old Recordings")
-        title2.frame = NSRect(x: 50, y: 70, width: 380, height: 20)
+        title2.frame = NSRect(x: innerPadding + 34, y: 62, width: boxWidth - innerPadding * 2 - 80, height: 20)
         title2.font = NSFont.systemFont(ofSize: 13, weight: .bold)
         groupContainer.addSubview(title2)
         
-        autoDeleteSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54, y: 68, width: 40, height: 24))
+        autoDeleteSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54 - innerPadding, y: 60, width: 54, height: 24))
         autoDeleteSwitch.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
         autoDeleteSwitch.target = self
         autoDeleteSwitch.action = #selector(autoDeleteSwitchToggled)
         groupContainer.addSubview(autoDeleteSwitch)
         
         let desc2 = NSTextField(wrappingLabelWithString: "Automatically removes recordings older than 15 days to keep your disk clean. Perfect for temporary AI bug demos. Can be turned off anytime.")
-        desc2.frame = NSRect(x: 50, y: 20, width: boxWidth - 66, height: 42)
+        desc2.frame = NSRect(x: innerPadding + 34, y: 12, width: boxWidth - innerPadding * 2 - 34, height: 42)
         desc2.font = NSFont.systemFont(ofSize: 11.5)
         desc2.textColor = .secondaryLabelColor
         groupContainer.addSubview(desc2)

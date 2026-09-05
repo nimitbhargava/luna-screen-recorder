@@ -25,7 +25,6 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
     }
     
     public func show() {
-        // Dismiss onboarding window so they never stack
         OnboardingWindowController.shared.window?.orderOut(nil)
         
         copyPathSwitch?.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
@@ -44,6 +43,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         var currentY: CGFloat = root.frame.height - 20
         let leftMargin: CGFloat = 28
         let boxWidth: CGFloat = root.frame.width - (leftMargin * 2) // 504
+        let innerPadding: CGFloat = 20
         
         // --- 1. AI & LLM WORKFLOW SECTION ---
         let aiHeader = NSTextField(labelWithString: "AI & LLM WORKFLOW")
@@ -61,24 +61,24 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         aiBox.borderColor = NSColor.separatorColor.withAlphaComponent(0.35)
         aiBox.borderWidth = 1.0
         
-        let aiIcon = NSImageView(frame: NSRect(x: 16, y: 56, width: 24, height: 24))
+        let aiIcon = NSImageView(frame: NSRect(x: innerPadding, y: 56, width: 24, height: 24))
         aiIcon.image = NSImage(systemSymbolName: "link.circle.fill", accessibilityDescription: nil)
         aiIcon.contentTintColor = .controlAccentColor
         aiBox.addSubview(aiIcon)
         
         let aiTitle = NSTextField(labelWithString: "Auto-Copy File Location on Stop")
-        aiTitle.frame = NSRect(x: 50, y: 58, width: 380, height: 20)
+        aiTitle.frame = NSRect(x: innerPadding + 34, y: 58, width: boxWidth - innerPadding * 2 - 80, height: 20)
         aiTitle.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         aiBox.addSubview(aiTitle)
         
-        copyPathSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54, y: 56, width: 40, height: 24))
+        copyPathSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54 - innerPadding, y: 56, width: 54, height: 24))
         copyPathSwitch.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
         copyPathSwitch.target = self
         copyPathSwitch.action = #selector(copyPathToggled)
         aiBox.addSubview(copyPathSwitch)
         
         let aiDesc = NSTextField(wrappingLabelWithString: "Copies local file path to clipboard on stop. Simply press ⌘V in Antigravity, Claude, ChatGPT, or Gemini for instant analysis.")
-        aiDesc.frame = NSRect(x: 50, y: 10, width: boxWidth - 66, height: 42)
+        aiDesc.frame = NSRect(x: innerPadding + 34, y: 10, width: boxWidth - innerPadding * 2 - 34, height: 42)
         aiDesc.font = NSFont.systemFont(ofSize: 11.5)
         aiDesc.textColor = .secondaryLabelColor
         aiBox.addSubview(aiDesc)
@@ -102,35 +102,35 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         storageBox.borderColor = NSColor.separatorColor.withAlphaComponent(0.35)
         storageBox.borderWidth = 1.0
         
-        let storageIcon = NSImageView(frame: NSRect(x: 16, y: 100, width: 24, height: 24))
+        let storageIcon = NSImageView(frame: NSRect(x: innerPadding, y: 100, width: 24, height: 24))
         storageIcon.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: nil)
         storageIcon.contentTintColor = .systemOrange
         storageBox.addSubview(storageIcon)
         
         let storageTitle = NSTextField(labelWithString: "15-Day Auto-Delete Old Recordings")
-        storageTitle.frame = NSRect(x: 50, y: 102, width: 380, height: 20)
+        storageTitle.frame = NSRect(x: innerPadding + 34, y: 102, width: boxWidth - innerPadding * 2 - 80, height: 20)
         storageTitle.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         storageBox.addSubview(storageTitle)
         
-        autoDeleteSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54, y: 100, width: 40, height: 24))
+        autoDeleteSwitch = NSSwitch(frame: NSRect(x: boxWidth - 54 - innerPadding, y: 100, width: 54, height: 24))
         autoDeleteSwitch.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
         autoDeleteSwitch.target = self
         autoDeleteSwitch.action = #selector(autoDeleteToggled)
         storageBox.addSubview(autoDeleteSwitch)
         
         let storageDesc = NSTextField(wrappingLabelWithString: "Automatically deletes recordings older than 15 days to save disk space. Perfect for temporary AI bug demo recordings.")
-        storageDesc.frame = NSRect(x: 50, y: 56, width: boxWidth - 66, height: 40)
+        storageDesc.frame = NSRect(x: innerPadding + 34, y: 56, width: boxWidth - innerPadding * 2 - 34, height: 40)
         storageDesc.font = NSFont.systemFont(ofSize: 11.5)
         storageDesc.textColor = .secondaryLabelColor
         storageBox.addSubview(storageDesc)
         
         // Inner divider
-        let div = NSBox(frame: NSRect(x: 16, y: 46, width: boxWidth - 32, height: 1))
+        let div = NSBox(frame: NSRect(x: innerPadding, y: 46, width: boxWidth - innerPadding * 2, height: 1))
         div.boxType = .separator
         storageBox.addSubview(div)
         
         // Action Buttons Row
-        let openFolderBtn = NSButton(frame: NSRect(x: 16, y: 10, width: 175, height: 28))
+        let openFolderBtn = NSButton(frame: NSRect(x: innerPadding, y: 10, width: 175, height: 28))
         openFolderBtn.title = "Open Folder in Finder"
         openFolderBtn.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         openFolderBtn.imagePosition = .imageLeading
@@ -140,7 +140,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         openFolderBtn.action = #selector(openFolderClicked)
         storageBox.addSubview(openFolderBtn)
         
-        let pruneBtn = NSButton(frame: NSRect(x: 200, y: 10, width: 160, height: 28))
+        let pruneBtn = NSButton(frame: NSRect(x: innerPadding + 184, y: 10, width: 160, height: 28))
         pruneBtn.title = "Prune Old Files Now"
         pruneBtn.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
         pruneBtn.imagePosition = .imageLeading
@@ -179,7 +179,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         for (i, item) in shortcuts.enumerated() {
             let rowY = CGFloat(86 - i * 26)
             let badge = NSTextField(labelWithString: " \(item.0) ")
-            badge.frame = NSRect(x: 16, y: rowY, width: 50, height: 20)
+            badge.frame = NSRect(x: innerPadding, y: rowY, width: 50, height: 20)
             badge.font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold)
             badge.textColor = .labelColor
             badge.wantsLayer = true
@@ -189,7 +189,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
             hotkeyBox.addSubview(badge)
             
             let label = NSTextField(labelWithString: item.1)
-            label.frame = NSRect(x: 76, y: rowY + 1, width: boxWidth - 90, height: 18)
+            label.frame = NSRect(x: innerPadding + 58, y: rowY + 1, width: boxWidth - innerPadding * 2 - 58, height: 18)
             label.font = NSFont.systemFont(ofSize: 12)
             label.textColor = .secondaryLabelColor
             hotkeyBox.addSubview(label)
