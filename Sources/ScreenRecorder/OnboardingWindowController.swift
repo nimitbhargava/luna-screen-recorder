@@ -7,6 +7,8 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
     private var card2: NSBox!
     private var autoDeleteRadio: NSButton!
     private var keepForeverRadio: NSButton!
+    private var copyPathCard: NSBox!
+    private var copyPathSwitch: NSSwitch!
     
     public init() {
         let window = NSWindow(
@@ -30,7 +32,9 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         let isAutoDelete = RetentionManager.shared.isAutoDeleteEnabled
         autoDeleteRadio?.state = isAutoDelete ? .on : .off
         keepForeverRadio?.state = isAutoDelete ? .off : .on
+        copyPathSwitch?.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
         updateCardStyles()
+        updateToggleCardStyle()
         
         window?.center()
         window?.makeKeyAndOrderFront(nil)
@@ -140,31 +144,48 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         card2.addGestureRecognizer(click2)
         root.addSubview(card2)
         
-        // --- 3. ANTIGRAVITY & AI AGENTS CALLOUT CARD ---
-        let calloutBox = NSBox(frame: NSRect(x: 36, y: root.frame.height - 496, width: cardWidth, height: 100))
-        calloutBox.boxType = .custom
-        calloutBox.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.08)
-        calloutBox.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.3)
-        calloutBox.borderWidth = 1
-        calloutBox.cornerRadius = 10
+        // --- 3. AUTO-COPY LOCATION FOR LLMs TOGGLE CARD ---
+        let toggleBox = NSBox(frame: NSRect(x: 36, y: root.frame.height - 502, width: cardWidth, height: 104))
+        toggleBox.boxType = .custom
+        toggleBox.cornerRadius = 10
+        self.copyPathCard = toggleBox
         
-        let calloutIcon = NSImageView(frame: NSRect(x: 14, y: calloutBox.frame.height - 34, width: 20, height: 20))
-        calloutIcon.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil)
-        calloutIcon.contentTintColor = .controlAccentColor
-        calloutBox.addSubview(calloutIcon)
+        let toggleIcon = NSImageView(frame: NSRect(x: 14, y: toggleBox.frame.height - 34, width: 22, height: 22))
+        toggleIcon.image = NSImage(systemSymbolName: "link.circle.fill", accessibilityDescription: nil)
+        toggleIcon.contentTintColor = .controlAccentColor
+        toggleBox.addSubview(toggleIcon)
         
-        let calloutHeader = NSTextField(labelWithString: "Default on Stop: Copy File Path (Antigravity)")
-        calloutHeader.frame = NSRect(x: 40, y: calloutBox.frame.height - 32, width: calloutBox.frame.width - 50, height: 18)
-        calloutHeader.font = NSFont.systemFont(ofSize: 12, weight: .bold)
-        calloutBox.addSubview(calloutHeader)
+        let toggleHeader = NSTextField(labelWithString: "Auto-Copy File Location on Stop")
+        toggleHeader.frame = NSRect(x: 44, y: toggleBox.frame.height - 32, width: 226, height: 18)
+        toggleHeader.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+        toggleBox.addSubview(toggleHeader)
         
-        let calloutBody = NSTextField(wrappingLabelWithString: "When recording stops, Luna automatically copies the local file path to your clipboard. Simply press ⌘V in Antigravity or your AI tool for instant multimodal analysis!")
-        calloutBody.frame = NSRect(x: 40, y: 12, width: calloutBox.frame.width - 54, height: 50)
-        calloutBody.font = NSFont.systemFont(ofSize: 11.5)
-        calloutBody.textColor = .secondaryLabelColor
-        calloutBox.addSubview(calloutBody)
+        // Recommended Badge Pill
+        let llmBadge = NSTextField(labelWithString: " RECOMMENDED FOR LLMs ")
+        llmBadge.frame = NSRect(x: 274, y: toggleBox.frame.height - 31, width: 148, height: 16)
+        llmBadge.font = NSFont.systemFont(ofSize: 9, weight: .bold)
+        llmBadge.textColor = .controlAccentColor
+        llmBadge.wantsLayer = true
+        llmBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        llmBadge.layer?.cornerRadius = 4
+        llmBadge.layer?.masksToBounds = true
+        toggleBox.addSubview(llmBadge)
         
-        root.addSubview(calloutBox)
+        // NSSwitch toggle control (default ON)
+        let switchControl = NSSwitch(frame: NSRect(x: toggleBox.frame.width - 54, y: toggleBox.frame.height - 35, width: 40, height: 22))
+        switchControl.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
+        switchControl.target = self
+        switchControl.action = #selector(copyPathSwitchToggled)
+        toggleBox.addSubview(switchControl)
+        self.copyPathSwitch = switchControl
+        
+        let toggleBody = NSTextField(wrappingLabelWithString: "When recording stops, Luna automatically copies the local file path to your clipboard. Simply press ⌘V in your LLM (Antigravity, Claude, ChatGPT, Gemini) for instant multimodal analysis!")
+        toggleBody.frame = NSRect(x: 44, y: 12, width: toggleBox.frame.width - 60, height: 52)
+        toggleBody.font = NSFont.systemFont(ofSize: 11.5)
+        toggleBody.textColor = .secondaryLabelColor
+        toggleBox.addSubview(toggleBody)
+        
+        root.addSubview(toggleBox)
         
         // --- 4. SHORTCUTS SUMMARY ---
         let shortcutsLbl = NSTextField(labelWithString: "Shortcuts:  ⌘⌥1 Area Crop  •  ⌘⌥2 Window Picker  •  ⌘⌥3 Full Screen  •  ⌘⌥S Stop")
@@ -189,6 +210,7 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         
         window.contentView = root
         updateCardStyles()
+        updateToggleCardStyle()
     }
     
     private func updateCardStyles() {
@@ -209,6 +231,19 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
             card2.borderColor = NSColor.controlAccentColor
             card2.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.06)
             card2.borderWidth = 1.5
+        }
+    }
+    
+    private func updateToggleCardStyle() {
+        let isEnabled = (copyPathSwitch?.state == .on)
+        if isEnabled {
+            copyPathCard?.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.06)
+            copyPathCard?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.35)
+            copyPathCard?.borderWidth = 1.2
+        } else {
+            copyPathCard?.fillColor = NSColor.controlBackgroundColor.withAlphaComponent(0.4)
+            copyPathCard?.borderColor = NSColor.separatorColor.withAlphaComponent(0.3)
+            copyPathCard?.borderWidth = 1.0
         }
     }
     
@@ -236,12 +271,20 @@ public final class OnboardingWindowController: NSWindowController, NSWindowDeleg
         updateCardStyles()
     }
     
+    @objc private func copyPathSwitchToggled() {
+        let isEnabled = (copyPathSwitch.state == .on)
+        RetentionManager.shared.isAutoCopyPathEnabled = isEnabled
+        updateToggleCardStyle()
+    }
+    
     @objc private func getStartedClicked() {
         let shouldAutoDelete = (autoDeleteRadio.state == .on)
+        let shouldCopyPath = (copyPathSwitch.state == .on)
         RetentionManager.shared.isAutoDeleteEnabled = shouldAutoDelete
+        RetentionManager.shared.isAutoCopyPathEnabled = shouldCopyPath
         RetentionManager.shared.hasCompletedOnboarding = true
         
         window?.orderOut(nil)
-        print("[Onboarding] Completed. Auto-delete enabled: \(shouldAutoDelete)")
+        print("[Onboarding] Completed. Auto-delete: \(shouldAutoDelete), Auto-copy path: \(shouldCopyPath)")
     }
 }

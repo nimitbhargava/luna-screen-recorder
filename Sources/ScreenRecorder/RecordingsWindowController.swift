@@ -93,7 +93,11 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
             tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
             tableView.scrollRowToVisible(index)
             selectedRecordingURL = latest
-            showFeedback(message: "✓ File path copied for Antigravity (⌘V)", isAccent: true)
+            if RetentionManager.shared.isAutoCopyPathEnabled {
+                showFeedback(message: "✓ File path copied for your LLM (⌘V)", isAccent: true)
+            } else {
+                hideFeedback()
+            }
         } else if !recordings.isEmpty {
             let index = 0
             tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
@@ -342,9 +346,9 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         let actionBar = NSView(frame: NSRect(x: 28, y: 18, width: detail.frame.width - 56, height: 54))
         actionBar.autoresizingMask = [.width, .maxYMargin]
         
-        // Primary CTA: Copy Path for Antigravity (Prominent Apple Accent Button)
-        let copyPathBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 195, height: 32))
-        copyPathBtn.title = "Copy Path (Antigravity)"
+        // Primary CTA: Copy Path for LLMs (Prominent Apple Accent Button)
+        let copyPathBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 185, height: 32))
+        copyPathBtn.title = "Copy Path for LLMs"
         copyPathBtn.image = NSImage(systemSymbolName: "link", accessibilityDescription: "Copy Path")
         copyPathBtn.imagePosition = .imageLeading
         copyPathBtn.bezelStyle = .rounded
@@ -550,7 +554,7 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
     @objc private func copyPathClicked() {
         guard let url = selectedRecordingURL else { return }
         PasteboardManager.shared.copyPathToPasteboard(fileURL: url)
-        showFeedback(message: "✓ Copied file path for Antigravity (⌘V)")
+        showFeedback(message: "✓ Copied file path for LLMs (⌘V)")
     }
     
     @objc private func copyMp4Clicked() {

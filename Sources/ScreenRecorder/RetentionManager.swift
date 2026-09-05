@@ -6,6 +6,7 @@ public final class RetentionManager {
     public let recordingsDirectory: URL
     
     public static let autoDeleteDidChangeNotification = Notification.Name("LunaAutoDeleteDidChangeNotification")
+    public static let autoCopyPathDidChangeNotification = Notification.Name("LunaAutoCopyPathDidChangeNotification")
     
     public var hasCompletedOnboarding: Bool {
         get {
@@ -13,6 +14,19 @@ public final class RetentionManager {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: "luna_has_completed_onboarding")
+        }
+    }
+    
+    public var isAutoCopyPathEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "luna_auto_copy_path_enabled") == nil {
+                return true // default enabled for LLM pasting
+            }
+            return UserDefaults.standard.bool(forKey: "luna_auto_copy_path_enabled")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "luna_auto_copy_path_enabled")
+            NotificationCenter.default.post(name: RetentionManager.autoCopyPathDidChangeNotification, object: nil)
         }
     }
     

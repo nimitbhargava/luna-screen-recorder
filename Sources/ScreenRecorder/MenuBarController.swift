@@ -19,6 +19,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private var startSectionSeparator: NSMenuItem!
     private var recordingSectionSeparator: NSMenuItem!
     private var autoDeleteToggleItem: NSMenuItem!
+    private var autoCopyPathToggleItem: NSMenuItem!
     private var windowSubmenu: NSMenu!
     private var screenSubmenu: NSMenu!
     
@@ -165,6 +166,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         autoDeleteToggleItem.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
         menu.addItem(autoDeleteToggleItem)
         
+        autoCopyPathToggleItem = NSMenuItem(title: "Auto-Copy File Location on Stop (for LLMs)", action: #selector(toggleAutoCopyPath), keyEquivalent: "")
+        autoCopyPathToggleItem.target = self
+        autoCopyPathToggleItem.image = NSImage(systemSymbolName: "link", accessibilityDescription: nil)
+        autoCopyPathToggleItem.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
+        menu.addItem(autoCopyPathToggleItem)
+        
         let pruneItem = NSMenuItem(title: "Prune Old Recordings Now", action: #selector(pruneRecordings), keyEquivalent: "")
         pruneItem.target = self
         pruneItem.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
@@ -209,6 +216,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         startSectionSeparator.isHidden = isRecording
         
         autoDeleteToggleItem.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
+        autoCopyPathToggleItem.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
         
         if isRecording {
             let mins = recordingSeconds / 60
@@ -400,8 +408,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             do {
                 let outputURL = try await CaptureEngine.shared.stopCapture()
                 
-                // Copy file path directly to clipboard (ideal for Antigravity & AI coding agents)
-                PasteboardManager.shared.copyPathToPasteboard(fileURL: outputURL)
+                // Copy file path directly to clipboard if enabled (ideal for LLMs & AI coding agents)
+                if RetentionManager.shared.isAutoCopyPathEnabled {
+                    PasteboardManager.shared.copyPathToPasteboard(fileURL: outputURL)
+                }
                 
                 // Prune old recordings (15 days if enabled)
                 RetentionManager.shared.pruneOldRecordings()
@@ -461,6 +471,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         autoDeleteToggleItem.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
     }
     
+    @objc private func toggleAutoCopyPath() {
+        RetentionManager.shared.isAutoCopyPathEnabled.toggle()
+        autoCopyPathToggleItem.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
+    }
+    
     @objc private func showOnboarding() {
         OnboardingWindowController.shared.show()
     }
@@ -492,7 +507,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         let content = UNMutableNotificationContent()
         content.title = "Luna 🌙: Recording Finished!"
         content.subtitle = "\(filename) (\(size))"
-        content.body = "File path copied to clipboard (ready for Antigravity & AI agents)."
+        if RetentionManager.shared.isAutoCopyPathEnabled {
+            content.body = "File path copied to clipboard for your LLM (⌘V)."
+        } else {
+            content.body = "Recording saved to your library."
+        }
         content.sound = .default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)

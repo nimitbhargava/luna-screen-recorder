@@ -50,6 +50,13 @@ public final class PasteboardManager {
     public func copyPathToPasteboard(fileURL: URL) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
+        
+        let filenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+        let pathList = [fileURL.path] as NSArray
+        pasteboard.setPropertyList(pathList, forType: filenamesType)
+        pasteboard.writeObjects([fileURL as NSURL])
         pasteboard.setString(fileURL.path, forType: .string)
+        
+        print("[PasteboardManager] Successfully copied path \(fileURL.path) to pasteboard")
     }
 }
