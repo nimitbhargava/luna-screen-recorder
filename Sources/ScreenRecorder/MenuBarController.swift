@@ -21,6 +21,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private var autoDeleteToggleItem: NSMenuItem!
     private var autoCopyPathToggleItem: NSMenuItem!
     private var windowSubmenu: NSMenu!
+    private var micMenuItem: NSMenuItem!
     
     public override init() {
         super.init()
@@ -52,9 +53,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     }
     
     private func setupNotifications() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                print("[MenuBarController] Notification auth error: \(error)")
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+                if let error = error {
+                    print("[MenuBarController] Notification auth error: \(error)")
+                }
             }
         }
         
@@ -75,10 +78,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     }
     
     @objc private func handleStartRecordingNotification(_ notification: Notification) {
+        print("[MenuBarController] Received startRecording notification")
         startMainScreenRecording()
     }
     
     @objc private func handleStopRecordingNotification(_ notification: Notification) {
+        print("[MenuBarController] Received stopRecording notification")
         stopRecording()
     }
     
@@ -169,6 +174,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         startSectionSeparator = NSMenuItem.separator()
         menu.addItem(startSectionSeparator)
         
+        micMenuItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
+        micMenuItem.image = NSImage(systemSymbolName: "mic", accessibilityDescription: nil)
+        menu.addItem(micMenuItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Persistent library & preference items
         let recentRecordingsItem = NSMenuItem(title: "Recent Recordings...", action: #selector(showRecentRecordings), keyEquivalent: "r")
         recentRecordingsItem.keyEquivalentModifierMask = [.command, .option]
@@ -244,6 +255,18 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         autoDeleteToggleItem.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
         autoCopyPathToggleItem.state = RetentionManager.shared.isAutoCopyPathEnabled ? .on : .off
         
+        let isMuted = MicrophoneManager.shared.isMuted
+        let micName = MicrophoneManager.shared.currentDeviceName
+        micMenuItem.title = isMuted ? "Microphone: Muted" : "Microphone: \(micName)"
+        micMenuItem.image = NSImage(systemSymbolName: isMuted ? "mic.slash.fill" : "mic.fill", accessibilityDescription: nil)
+        micMenuItem.submenu = MicrophoneManager.shared.buildMenu { [weak self] in
+            guard let self = self else { return }
+            let isMuted = MicrophoneManager.shared.isMuted
+            let micName = MicrophoneManager.shared.currentDeviceName
+            self.micMenuItem.title = isMuted ? "Microphone: Muted" : "Microphone: \(micName)"
+            self.micMenuItem.image = NSImage(systemSymbolName: isMuted ? "mic.slash.fill" : "mic.fill", accessibilityDescription: nil)
+        }
+        
         if isRecording {
             let mins = recordingSeconds / 60
             let secs = recordingSeconds % 60
@@ -314,13 +337,22 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     }
     
     @objc public func startMainScreenRecording() {
+        print("[MenuBarController] startMainScreenRecording entered")
         Task { @MainActor in
-            guard let content = try? await CaptureEngine.fetchShareableContent(),
-                  let mainDisplay = content.displays.first else {
-                showErrorNotification(message: "Failed to access display for recording")
-                return
+            do {
+                let content = try await CaptureEngine.fetchShareableContent()
+                print("[MenuBarController] Fetched shareable content: \(content.displays.count) displays")
+                guard let mainDisplay = content.displays.first else {
+                    print("[MenuBarController] No display found in shareable content")
+                    showErrorNotification(message: "Failed to access display for recording")
+                    return
+                }
+                print("[MenuBarController] Starting recording on display: \(mainDisplay.displayID)")
+                self.beginRecording(target: .display(mainDisplay))
+            } catch {
+                print("[MenuBarController] Failed to fetch shareable content: \(error)")
+                showErrorNotification(message: "Failed to access display: \(error.localizedDescription)")
             }
-            self.beginRecording(target: .display(mainDisplay))
         }
     }
     
@@ -359,6 +391,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                     }
                 )
             } catch {
+                print("[MenuBarController] Failed to start capture (filter): \(error)")
                 showErrorNotification(message: "Failed to start capture: \(error.localizedDescription)")
             }
         }
@@ -385,6 +418,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                     }
                 )
             } catch {
+                print("[MenuBarController] Failed to start capture (target): \(error)")
                 showErrorNotification(message: "Failed to start capture: \(error.localizedDescription)")
             }
         }
@@ -540,7 +574,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         content.sound = .default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().add(request)
+        }
     }
     
     private func showErrorNotification(message: String) {
@@ -550,6 +586,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         content.sound = .default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().add(request)
+        }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 public final class MediaPostProcessor {
     public static let shared = MediaPostProcessor()
@@ -19,7 +20,7 @@ public final class MediaPostProcessor {
         }
     }
     
-    /// Remuxes the MP4 with `+faststart` and injects a silent AAC audio track so web platforms like Gemini accept it.
+    /// Remuxes the MP4 with `+faststart` and preserves real audio track, or injects a silent AAC audio track if muted so web platforms like Gemini accept it.
     @discardableResult
     public func remuxForWebCompatibility(inputURL: URL) -> URL {
         guard let ffmpeg = ffmpegPath else {
@@ -29,19 +30,35 @@ public final class MediaPostProcessor {
         
         let tempURL = inputURL.deletingPathExtension().appendingPathExtension("web.mp4")
         
+        let asset = AVURLAsset(url: inputURL)
+        let hasAudio = !asset.tracks(withMediaType: .audio).isEmpty
+        
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ffmpeg)
-        process.arguments = [
-            "-y",
-            "-i", inputURL.path,
-            "-f", "lavfi",
-            "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-shortest",
-            "-movflags", "+faststart",
-            tempURL.path
-        ]
+        
+        if hasAudio {
+            // Video already contains recorded microphone audio: copy both video and audio directly
+            process.arguments = [
+                "-y",
+                "-i", inputURL.path,
+                "-c", "copy",
+                "-movflags", "+faststart",
+                tempURL.path
+            ]
+        } else {
+            // Muted recording: inject silent null audio so web/Gemini accept it
+            process.arguments = [
+                "-y",
+                "-i", inputURL.path,
+                "-f", "lavfi",
+                "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-shortest",
+                "-movflags", "+faststart",
+                tempURL.path
+            ]
+        }
         
         do {
             try process.run()

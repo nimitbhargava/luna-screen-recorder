@@ -1,6 +1,11 @@
 import AppKit
 import CoreGraphics
 
+freopen("/tmp/luna.log", "a+", stdout)
+freopen("/tmp/luna.log", "a+", stderr)
+setbuf(__stdoutp, nil)
+setbuf(__stderrp, nil)
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Setup menu bar item, hotkeys, and visual picker

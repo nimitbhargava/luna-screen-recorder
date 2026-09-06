@@ -6,6 +6,7 @@ public final class VideoEncoder {
     private let outputURL: URL
     private let assetWriter: AVAssetWriter
     private let writerInput: AVAssetWriterInput
+    private var audioInput: AVAssetWriterInput?
     private let encodingQueue = DispatchQueue(label: "com.screenrecorder.encoder")
     
     private var isSessionStarted = false
@@ -15,7 +16,7 @@ public final class VideoEncoder {
     private var pauseStartTime: CMTime?
     private var totalPausedDuration: CMTime = .zero
     
-    public init(outputURL: URL, width: Int, height: Int, frameRate: Int = 30) throws {
+    public init(outputURL: URL, width: Int, height: Int, frameRate: Int = 30, enableAudio: Bool = true) throws {
         self.outputURL = outputURL
         
         // Ensure even dimensions for H.264
@@ -52,12 +53,33 @@ public final class VideoEncoder {
             throw NSError(domain: "VideoEncoder", code: -1, userInfo: [NSLocalizedDescriptionKey: "Cannot add video input to asset writer"])
         }
         assetWriter.add(writerInput)
+        
+        if enableAudio {
+            let audioSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 128000
+            ]
+            let aInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            aInput.expectsMediaDataInRealTime = true
+            if assetWriter.canAdd(aInput) {
+                assetWriter.add(aInput)
+                self.audioInput = aInput
+                print("[VideoEncoder] Configured AAC audio input track")
+            } else {
+                print("[VideoEncoder] Warning: Cannot add audio input to asset writer")
+            }
+        }
     }
     
     public func start() throws {
         guard assetWriter.startWriting() else {
-            throw assetWriter.error ?? NSError(domain: "VideoEncoder", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to start writing"])
+            let err = assetWriter.error ?? NSError(domain: "VideoEncoder", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to start writing"])
+            print("[VideoEncoder] Failed to start writing: \(err)")
+            throw err
         }
+        print("[VideoEncoder] Started writing to \(outputURL.lastPathComponent)")
     }
     
     public func pause() {
@@ -116,6 +138,39 @@ public final class VideoEncoder {
         }
     }
     
+    public func appendAudio(sampleBuffer: CMSampleBuffer) {
+        encodingQueue.async { [weak self] in
+            guard let self = self, !self.isFinished, let aInput = self.audioInput else { return }
+            guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
+            
+            let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            guard pts.isValid else { return }
+            
+            if self.isPaused {
+                return
+            }
+            
+            let adjustedPTS = CMTimeSubtract(pts, self.totalPausedDuration)
+            
+            if !self.isSessionStarted {
+                self.assetWriter.startSession(atSourceTime: adjustedPTS)
+                self.isSessionStarted = true
+            }
+            
+            if self.totalPausedDuration.seconds > 0.001 {
+                if let adjustedBuffer = self.adjustTimestamp(sampleBuffer: sampleBuffer, newPTS: adjustedPTS) {
+                    if aInput.isReadyForMoreMediaData {
+                        aInput.append(adjustedBuffer)
+                    }
+                }
+            } else {
+                if aInput.isReadyForMoreMediaData {
+                    aInput.append(sampleBuffer)
+                }
+            }
+        }
+    }
+    
     private func adjustTimestamp(sampleBuffer: CMSampleBuffer, newPTS: CMTime) -> CMSampleBuffer? {
         var count: CMItemCount = 0
         CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &count)
@@ -148,6 +203,7 @@ public final class VideoEncoder {
                 return
             }
             
+            self.audioInput?.markAsFinished()
             self.writerInput.markAsFinished()
             self.assetWriter.finishWriting {
                 if let error = self.assetWriter.error {

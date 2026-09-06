@@ -5,6 +5,7 @@ public final class RecordingHUDController: NSObject {
     
     private var window: NSPanel?
     private var timerLabel: NSTextField?
+    private var micButton: NSButton?
     private var pauseButton: NSButton?
     private var stopButton: NSButton?
     private var statusDot: NSView?
@@ -42,6 +43,7 @@ public final class RecordingHUDController: NSObject {
             }
             
             self.updateUI(seconds: 0, isPaused: false)
+            self.updateMicButton()
             self.positionWindow()
             self.startPulseAnimation()
             self.window?.orderFrontRegardless()
@@ -73,7 +75,7 @@ public final class RecordingHUDController: NSObject {
     
     private func createWindow() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 232, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 282, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -88,6 +90,13 @@ public final class RecordingHUDController: NSObject {
         NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
             self?.hasCustomPosition = true
         }
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(microphoneSelectionChanged),
+            name: MicrophoneManager.selectionDidChangeNotification,
+            object: nil
+        )
         
         let visualEffect = NSVisualEffectView(frame: panel.contentView!.bounds)
         visualEffect.autoresizingMask = [.width, .height]
@@ -121,14 +130,31 @@ public final class RecordingHUDController: NSObject {
         visualEffect.addSubview(label)
         self.timerLabel = label
         
-        // Subtle divider
-        let divider = NSView(frame: NSRect(x: 104, y: 11, width: 1, height: 22))
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.2).cgColor
-        visualEffect.addSubview(divider)
+        // Subtle divider 1
+        let divider1 = NSView(frame: NSRect(x: 104, y: 11, width: 1, height: 22))
+        divider1.wantsLayer = true
+        divider1.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.2).cgColor
+        visualEffect.addSubview(divider1)
+        
+        // Apple-style Glass Microphone Button
+        let micBtn = NSButton(frame: NSRect(x: 114, y: 8, width: 34, height: 28))
+        micBtn.bezelStyle = .inline
+        micBtn.isBordered = false
+        micBtn.imagePosition = .imageOnly
+        micBtn.target = self
+        micBtn.action = #selector(micButtonClicked)
+        visualEffect.addSubview(micBtn)
+        self.micButton = micBtn
+        updateMicButton()
+        
+        // Subtle divider 2
+        let divider2 = NSView(frame: NSRect(x: 154, y: 11, width: 1, height: 22))
+        divider2.wantsLayer = true
+        divider2.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.2).cgColor
+        visualEffect.addSubview(divider2)
         
         // Apple-style Glass Pause / Resume Button
-        let pauseBtn = NSButton(frame: NSRect(x: 114, y: 8, width: 34, height: 28))
+        let pauseBtn = NSButton(frame: NSRect(x: 164, y: 8, width: 34, height: 28))
         pauseBtn.bezelStyle = .inline
         pauseBtn.isBordered = false
         pauseBtn.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Pause")
@@ -141,7 +167,7 @@ public final class RecordingHUDController: NSObject {
         self.pauseButton = pauseBtn
         
         // Apple-style Stop Button (Pill with stop.fill)
-        let stopBtn = NSButton(frame: NSRect(x: 154, y: 7, width: 66, height: 30))
+        let stopBtn = NSButton(frame: NSRect(x: 204, y: 7, width: 66, height: 30))
         stopBtn.bezelStyle = .rounded
         stopBtn.title = "Stop"
         stopBtn.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: "Stop")
@@ -193,6 +219,29 @@ public final class RecordingHUDController: NSObject {
             }
             pauseButton?.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Pause")
             pauseButton?.toolTip = "Pause Recording (⌘⌥P)"
+        }
+    }
+    
+    @objc private func micButtonClicked(_ sender: NSButton) {
+        let menu = MicrophoneManager.shared.buildMenu { [weak self] in
+            self?.updateMicButton()
+        }
+        let pt = NSPoint(x: -8, y: -4)
+        menu.popUp(positioning: nil, at: pt, in: sender)
+    }
+    
+    public func updateMicButton() {
+        let isMuted = MicrophoneManager.shared.isMuted
+        let micName = MicrophoneManager.shared.currentDeviceName
+        let iconName = isMuted ? "mic.slash.fill" : "mic.fill"
+        micButton?.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Microphone")
+        micButton?.contentTintColor = isMuted ? .systemOrange : .white
+        micButton?.toolTip = isMuted ? "Microphone: Muted (Click to choose microphone)" : "Microphone: \(micName) (Click to choose microphone)"
+    }
+    
+    @objc private func microphoneSelectionChanged(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateMicButton()
         }
     }
     

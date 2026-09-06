@@ -100,12 +100,19 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         config.width = outputWidth
         config.height = outputHeight
         
-        let encoder = try VideoEncoder(outputURL: outputURL, width: outputWidth, height: outputHeight, frameRate: 30)
+        let enableAudio = !MicrophoneManager.shared.isMuted
+        let encoder = try VideoEncoder(outputURL: outputURL, width: outputWidth, height: outputHeight, frameRate: 30, enableAudio: enableAudio)
         try encoder.start()
         
         self.videoEncoder = encoder
         self.currentOutputURL = outputURL
         self.isPaused = false
+        
+        if enableAudio {
+            try? MicrophoneManager.shared.startCapture { [weak encoder] sampleBuffer in
+                encoder?.appendAudio(sampleBuffer: sampleBuffer)
+            }
+        }
         
         let newStream = SCStream(filter: filter, configuration: config, delegate: self)
         try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: captureQueue)
@@ -149,12 +156,19 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
             InteractionTracker.shared.startSession(outputURL: outputURL)
         }
         
-        let encoder = try VideoEncoder(outputURL: outputURL, width: outputWidth, height: outputHeight, frameRate: 30)
+        let enableAudio = !MicrophoneManager.shared.isMuted
+        let encoder = try VideoEncoder(outputURL: outputURL, width: outputWidth, height: outputHeight, frameRate: 30, enableAudio: enableAudio)
         try encoder.start()
         
         self.videoEncoder = encoder
         self.currentOutputURL = outputURL
         self.isPaused = false
+        
+        if enableAudio {
+            try? MicrophoneManager.shared.startCapture { [weak encoder] sampleBuffer in
+                encoder?.appendAudio(sampleBuffer: sampleBuffer)
+            }
+        }
         
         let newStream = SCStream(filter: filter, configuration: config, delegate: self)
         try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: captureQueue)
@@ -169,6 +183,7 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         guard isRecording, !isPaused else { return }
         isPaused = true
         videoEncoder?.pause()
+        MicrophoneManager.shared.pause()
         print("[CaptureEngine] Capture paused")
     }
     
@@ -176,6 +191,7 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         guard isRecording, isPaused else { return }
         isPaused = false
         videoEncoder?.resume()
+        MicrophoneManager.shared.resume()
         print("[CaptureEngine] Capture resumed")
     }
     
@@ -188,6 +204,7 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         self.isPaused = false
         try await stream.stopCapture()
         self.stream = nil
+        MicrophoneManager.shared.stopCapture()
         
         // Stop semantic interaction tracking and save events
         await MainActor.run {
