@@ -69,6 +69,12 @@ cat << EOF > "$APP_DIR/Contents/Info.plist"
     <true/>
     <key>NSScreenCaptureUsageDescription</key>
     <string>Luna requires screen capture access to record displays, windows, or selected regions.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Luna uses on-device speech recognition to transcribe voice narration for AI prompts.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Luna requires microphone access to record and transcribe voice narration.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Luna uses AppleScript to detect active browser URLs for context logging.</string>
 </dict>
 </plist>
 EOF

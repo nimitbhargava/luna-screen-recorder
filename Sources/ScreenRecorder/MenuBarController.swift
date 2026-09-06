@@ -21,7 +21,6 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private var autoDeleteToggleItem: NSMenuItem!
     private var autoCopyPathToggleItem: NSMenuItem!
     private var windowSubmenu: NSMenu!
-    private var screenSubmenu: NSMenu!
     
     public override init() {
         super.init()
@@ -58,6 +57,29 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 print("[MenuBarController] Notification auth error: \(error)")
             }
         }
+        
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleStartRecordingNotification(_:)),
+            name: NSNotification.Name("com.luna.screenrecorder.startRecording"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleStopRecordingNotification(_:)),
+            name: NSNotification.Name("com.luna.screenrecorder.stopRecording"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+    }
+    
+    @objc private func handleStartRecordingNotification(_ notification: Notification) {
+        startMainScreenRecording()
+    }
+    
+    @objc private func handleStopRecordingNotification(_ notification: Notification) {
+        stopRecording()
     }
     
     private func setupHotKeys() {
@@ -139,10 +161,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         recordWindowMenuItem.submenu = windowSubmenu
         menu.addItem(recordWindowMenuItem)
         
-        recordScreenMenuItem = NSMenuItem(title: "Quick Display List", action: nil, keyEquivalent: "")
+        recordScreenMenuItem = NSMenuItem(title: "Record Entire Screen (⌘⌥3)", action: #selector(startMainScreenRecording), keyEquivalent: "")
+        recordScreenMenuItem.target = self
         recordScreenMenuItem.image = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
-        screenSubmenu = NSMenu()
-        recordScreenMenuItem.submenu = screenSubmenu
         menu.addItem(recordScreenMenuItem)
         
         startSectionSeparator = NSMenuItem.separator()
@@ -242,19 +263,6 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         Task { @MainActor in
             guard let content = try? await CaptureEngine.fetchShareableContent() else { return }
             
-            // Refresh Displays
-            self.screenSubmenu.removeAllItems()
-            for display in content.displays {
-                let item = NSMenuItem(
-                    title: "Display \(display.displayID) (\(display.width) × \(display.height))",
-                    action: #selector(self.displaySelected(_:)),
-                    keyEquivalent: ""
-                )
-                item.representedObject = display
-                item.target = self
-                self.screenSubmenu.addItem(item)
-            }
-            
             // Refresh Windows
             self.windowSubmenu.removeAllItems()
             let filteredWindows = content.windows.filter { window in
@@ -305,7 +313,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         beginRecording(target: .window(window))
     }
     
-    public func startMainScreenRecording() {
+    @objc public func startMainScreenRecording() {
         Task { @MainActor in
             guard let content = try? await CaptureEngine.fetchShareableContent(),
                   let mainDisplay = content.displays.first else {
@@ -413,11 +421,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             do {
                 let outputURL = try await CaptureEngine.shared.stopCapture()
                 
-                // Copy file path directly to clipboard if enabled (ideal for LLMs & AI coding agents)
+                // Copy file path and action prompt directly to clipboard if enabled (ideal for LLMs & AI coding agents)
                 if RetentionManager.shared.isAutoCopyPathEnabled {
-                    PasteboardManager.shared.copyPathToPasteboard(fileURL: outputURL)
+                    PasteboardManager.shared.copyAIPromptToPasteboard(fileURL: outputURL)
                     ToastHUDController.shared.show(
-                        title: "Recording URL Copied",
+                        title: "Recording + Actions Copied",
                         message: "Ready to paste (⌘V) into your LLM",
                         fileURL: outputURL
                     )

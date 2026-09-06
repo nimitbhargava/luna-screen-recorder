@@ -53,4 +53,19 @@ public final class PasteboardManager {
         pasteboard.setString(fileURL.path, forType: .string)
         print("[PasteboardManager] Successfully copied path as plain text \(fileURL.path) to pasteboard")
     }
+    
+    public func copyAIPromptToPasteboard(fileURL: URL) {
+        let promptURL = fileURL.deletingPathExtension().appendingPathExtension("prompt.md")
+        let promptContent: String
+        if let savedPrompt = try? String(contentsOf: promptURL, encoding: .utf8), !savedPrompt.isEmpty {
+            promptContent = savedPrompt
+        } else {
+            promptContent = InteractionTracker.shared.generatePromptMarkdown(videoURL: fileURL)
+        }
+        
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(promptContent, forType: .string)
+        print("[PasteboardManager] Successfully copied AI prompt with path & interaction log to pasteboard")
+    }
 }

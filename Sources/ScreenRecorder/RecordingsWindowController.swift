@@ -606,8 +606,8 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
             selectedRecordingURL = url
             updatePlayerAndDetails()
         }
-        PasteboardManager.shared.copyPathToPasteboard(fileURL: url)
-        showFeedback(message: "✓ Copied file path for LLMs (⌘V)")
+        PasteboardManager.shared.copyAIPromptToPasteboard(fileURL: url)
+        showFeedback(message: "✓ Copied path & actions for LLMs (⌘V)")
     }
     
     @objc private func copyPathClicked() {

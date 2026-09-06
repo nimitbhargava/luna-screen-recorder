@@ -28,7 +28,7 @@ public final class HotKeyManager {
         )
         
         let status = InstallEventHandler(
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             { (_, theEvent, _) -> OSStatus in
                 var hotKeyID = EventHotKeyID()
                 let err = GetEventParameter(
@@ -86,7 +86,7 @@ public final class HotKeyManager {
             keyCode,
             modifiers,
             hotKeyID,
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             0,
             &hotKeyRef
         )

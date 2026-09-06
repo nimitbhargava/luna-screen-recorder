@@ -36,12 +36,23 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         // Find windows belonging to this app to exclude them from recording (e.g. HUD and overlay)
         let shareableContent = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         let myPID = ProcessInfo.processInfo.processIdentifier
-        let appWindowsToExclude = shareableContent?.windows.filter {
-            $0.owningApplication?.processID == myPID ||
-            $0.owningApplication?.applicationName == "Luna" ||
-            $0.owningApplication?.applicationName == "ScreenRecorder" ||
-            $0.owningApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
+        let appWindowsToExclude = shareableContent?.windows.filter { window in
+            let isAppWindow = window.owningApplication?.processID == myPID ||
+                              window.owningApplication?.applicationName == "Luna" ||
+                              window.owningApplication?.applicationName == "ScreenRecorder" ||
+                              window.owningApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
+            guard isAppWindow else { return false }
+            // Do NOT exclude visual click ripple overlay window so clicks are rendered into video
+            if window.title == "LunaClickRippleOverlay" {
+                return false
+            }
+            return true
         } ?? []
+        
+        // Start semantic interaction tracking and visual ripple overlay
+        await MainActor.run {
+            InteractionTracker.shared.startSession(outputURL: outputURL)
+        }
         
         let filter: SCContentFilter
         let config = SCStreamConfiguration()
@@ -133,6 +144,11 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         config.width = outputWidth
         config.height = outputHeight
         
+        // Start semantic interaction tracking and visual ripple overlay
+        await MainActor.run {
+            InteractionTracker.shared.startSession(outputURL: outputURL)
+        }
+        
         let encoder = try VideoEncoder(outputURL: outputURL, width: outputWidth, height: outputHeight, frameRate: 30)
         try encoder.start()
         
@@ -173,6 +189,11 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         try await stream.stopCapture()
         self.stream = nil
         
+        // Stop semantic interaction tracking and save events
+        await MainActor.run {
+            _ = InteractionTracker.shared.stopSession()
+        }
+        
         let rawURL = try await withCheckedThrowingContinuation { continuation in
             encoder.finish { result in
                 switch result {
@@ -186,6 +207,29 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         
         // Optimize with faststart & inject silent audio so web/Gemini accept it cleanly
         let finalURL = MediaPostProcessor.shared.remuxForWebCompatibility(inputURL: rawURL)
+        
+        // Background extraction of Apple Vision keyframes and Audio transcription
+        Task.detached(priority: .userInitiated) {
+            let events = InteractionTracker.shared.getEvents()
+            let keyframes = await KeyframeExtractor.shared.extractKeyframes(videoURL: finalURL, events: events)
+            let transcript = await AudioTranscriber.shared.transcribeAudio(from: finalURL)
+            let richPrompt = InteractionTracker.shared.generatePromptMarkdown(
+                videoURL: finalURL,
+                events: events,
+                keyframePaths: keyframes.map { $0.path },
+                speechTranscript: transcript
+            )
+            let promptURL = finalURL.deletingPathExtension().appendingPathExtension("prompt.md")
+            try? richPrompt.data(using: .utf8)?.write(to: promptURL)
+            print("[CaptureEngine] Enriched prompt generated with \(keyframes.count) keyframes")
+            
+            if RetentionManager.shared.isAutoCopyPathEnabled {
+                await MainActor.run {
+                    PasteboardManager.shared.copyAIPromptToPasteboard(fileURL: finalURL)
+                }
+            }
+        }
+        
         return finalURL
     }
     
