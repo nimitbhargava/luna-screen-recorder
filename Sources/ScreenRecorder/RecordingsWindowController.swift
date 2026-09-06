@@ -340,8 +340,8 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         headerView.addSubview(subTitle)
         self.subtitleLabel = subTitle
         
-        // Feedback Pill (Apple-style subtle capsule)
-        let pill = NSBox(frame: NSRect(x: headerView.frame.width - 230, y: 12, width: 230, height: 28))
+        // Feedback Pill (Apple-style subtle capsule with comfortable padding)
+        let pill = NSBox(frame: NSRect(x: headerView.frame.width - 280, y: 11, width: 280, height: 28))
         pill.boxType = .custom
         pill.cornerRadius = 14
         pill.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12)
@@ -350,8 +350,8 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         pill.autoresizingMask = [.minXMargin]
         pill.isHidden = true
         
-        let pillLbl = NSTextField(labelWithString: "✓ Copied for Antigravity (⌘V)")
-        pillLbl.frame = NSRect(x: 10, y: 5, width: 210, height: 16)
+        let pillLbl = NSTextField(labelWithString: "✓ Copied file path for LLMs (⌘V)")
+        pillLbl.frame = NSRect(x: 18, y: 6, width: 244, height: 16)
         pillLbl.font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
         pillLbl.textColor = .controlAccentColor
         pillLbl.alignment = .center
@@ -379,28 +379,28 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         detail.addSubview(pView)
         self.playerView = pView
         
-        // Action Bar (Bottom)
-        let actionBar = NSView(frame: NSRect(x: 28, y: 18, width: detail.frame.width - 56, height: 54))
+        // Action Bar (Bottom with clean vertical rhythm and button padding)
+        let actionBar = NSView(frame: NSRect(x: 28, y: 14, width: detail.frame.width - 56, height: 60))
         actionBar.autoresizingMask = [.width, .maxYMargin]
         
-        // Primary CTA: Copy Path for LLMs (Prominent Apple Accent Button)
-        let copyPathBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 185, height: 32))
-        copyPathBtn.title = "Copy Path for LLMs"
-        copyPathBtn.image = NSImage(systemSymbolName: "link", accessibilityDescription: "Copy Path")
-        copyPathBtn.imagePosition = .imageLeading
+        // Primary CTA: Copy Path for LLMs (Native Rounded Button with Accent Bezel & Balanced Insets)
+        let copyPathBtn = NSButton(frame: .zero)
         copyPathBtn.bezelStyle = .rounded
-        copyPathBtn.wantsLayer = true
-        copyPathBtn.layer?.cornerRadius = 6
-        copyPathBtn.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+        copyPathBtn.bezelColor = .controlAccentColor
+        let symbolConfig = NSImage.SymbolConfiguration(paletteColors: [.white])
+        copyPathBtn.image = NSImage(systemSymbolName: "link", accessibilityDescription: "Copy Path")?.withSymbolConfiguration(symbolConfig)
+        copyPathBtn.imagePosition = .imageLeading
         copyPathBtn.contentTintColor = .white
-        copyPathBtn.font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+        copyPathBtn.attributedTitle = NSAttributedString(string: "Copy Path for LLMs", attributes: [
+            .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+        ])
         copyPathBtn.keyEquivalent = "\r"
-        copyPathBtn.isBordered = false
         copyPathBtn.target = self
         copyPathBtn.action = #selector(copyPathClicked)
         
         // Secondary Actions Group
-        let copyMp4Btn = NSButton(frame: NSRect(x: 0, y: 0, width: 105, height: 32))
+        let copyMp4Btn = NSButton(frame: .zero)
         copyMp4Btn.title = "Copy MP4"
         copyMp4Btn.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy MP4")
         copyMp4Btn.imagePosition = .imageLeading
@@ -409,7 +409,7 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         copyMp4Btn.target = self
         copyMp4Btn.action = #selector(copyMp4Clicked)
         
-        let copyGifBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 100, height: 32))
+        let copyGifBtn = NSButton(frame: .zero)
         copyGifBtn.title = "Copy GIF"
         copyGifBtn.image = NSImage(systemSymbolName: "photo", accessibilityDescription: "Copy GIF")
         copyGifBtn.imagePosition = .imageLeading
@@ -418,7 +418,7 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         copyGifBtn.target = self
         copyGifBtn.action = #selector(copyGifClicked)
         
-        let revealBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 100, height: 32))
+        let revealBtn = NSButton(frame: .zero)
         revealBtn.title = "In Finder"
         revealBtn.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "In Finder")
         revealBtn.imagePosition = .imageLeading
@@ -427,7 +427,7 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         revealBtn.target = self
         revealBtn.action = #selector(revealClicked)
         
-        let deleteBtn = NSButton(frame: NSRect(x: 0, y: 0, width: 88, height: 32))
+        let deleteBtn = NSButton(frame: .zero)
         deleteBtn.title = "Delete"
         deleteBtn.image = NSImage(systemSymbolName: "trash", accessibilityDescription: "Delete")
         deleteBtn.imagePosition = .imageLeading
@@ -442,7 +442,7 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         buttonStack.orientation = .horizontal
         buttonStack.spacing = 8
         buttonStack.alignment = .centerY
-        buttonStack.frame = NSRect(x: 0, y: 16, width: actionBar.frame.width, height: 32)
+        buttonStack.frame = NSRect(x: 0, y: 24, width: actionBar.frame.width, height: 32)
         buttonStack.autoresizingMask = [.width]
         
         buttonStack.addView(copyPathBtn, in: .leading)
@@ -453,9 +453,9 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         
         actionBar.addSubview(buttonStack)
         
-        // Helpful subtitle tip below buttons
+        // Helpful subtitle tip below buttons with comfortable 8px breathing room
         let tipLbl = NSTextField(labelWithString: "Ready for Antigravity. Simply press ⌘V in your prompt to inspect recording.")
-        tipLbl.frame = NSRect(x: 2, y: 0, width: actionBar.frame.width - 4, height: 14)
+        tipLbl.frame = NSRect(x: 2, y: 2, width: actionBar.frame.width - 4, height: 14)
         tipLbl.font = NSFont.systemFont(ofSize: 11)
         tipLbl.textColor = .tertiaryLabelColor
         actionBar.addSubview(tipLbl)
@@ -489,6 +489,16 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
     // MARK: - Feedback Banner
     private func showFeedback(message: String, isAccent: Bool = true) {
         feedbackLabel.stringValue = message
+        feedbackLabel.sizeToFit()
+        let textWidth = ceil(feedbackLabel.frame.width)
+        let pillWidth = max(textWidth + 36, 180)
+        let pillHeight: CGFloat = 28
+        let pillY: CGFloat = 11
+        if let superview = feedbackPill.superview {
+            feedbackPill.frame = NSRect(x: superview.frame.width - pillWidth, y: pillY, width: pillWidth, height: pillHeight)
+        }
+        feedbackLabel.frame = NSRect(x: 18, y: 6, width: textWidth, height: 16)
+        
         if isAccent {
             feedbackPill.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12)
             feedbackPill.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.35)
@@ -821,7 +831,7 @@ final class SidebarRecordingCellView: NSTableCellView {
     
     private func setupViews() {
         // Thumbnail
-        thumbnailImageView.frame = NSRect(x: 8, y: 7, width: 58, height: 38)
+        thumbnailImageView.frame = NSRect(x: 10, y: 8, width: 58, height: 38)
         thumbnailImageView.imageScaling = .scaleProportionallyUpOrDown
         thumbnailImageView.wantsLayer = true
         thumbnailImageView.layer?.cornerRadius = 5
@@ -832,7 +842,7 @@ final class SidebarRecordingCellView: NSTableCellView {
         addSubview(thumbnailImageView)
         
         // Duration Badge on Thumbnail (YouTube/QuickTime style)
-        durationBadge.frame = NSRect(x: 23, y: 2, width: 33, height: 13)
+        durationBadge.frame = NSRect(x: 23, y: 2, width: 32, height: 13)
         durationBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .bold)
         durationBadge.textColor = .white
         durationBadge.alignment = .center
@@ -844,14 +854,14 @@ final class SidebarRecordingCellView: NSTableCellView {
         thumbnailImageView.addSubview(durationBadge)
         
         // Title
-        titleLabel.frame = NSRect(x: 74, y: 26, width: 170, height: 18)
+        titleLabel.frame = NSRect(x: 78, y: 27, width: 170, height: 18)
         titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.autoresizingMask = [.width]
         addSubview(titleLabel)
         
         // Subtitle
-        subtitleLabel.frame = NSRect(x: 74, y: 8, width: 170, height: 15)
+        subtitleLabel.frame = NSRect(x: 78, y: 9, width: 170, height: 15)
         subtitleLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
         subtitleLabel.textColor = .secondaryLabelColor
         subtitleLabel.lineBreakMode = .byTruncatingTail
@@ -891,6 +901,9 @@ final class SidebarRecordingCellView: NSTableCellView {
                 guard self.currentURL == url else { return }
                 if secs > 0 {
                     self.durationBadge.stringValue = durStr
+                    self.durationBadge.sizeToFit()
+                    let badgeW = max(self.durationBadge.frame.width + 6, 28)
+                    self.durationBadge.frame = NSRect(x: 58 - badgeW - 3, y: 2, width: badgeW, height: 13)
                     self.durationBadge.isHidden = false
                     self.subtitleLabel.stringValue = "\(durStr)  •  \(sizeStr)"
                 }
