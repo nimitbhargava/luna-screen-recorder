@@ -227,17 +227,54 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         
-        let tbl = NSTableView(frame: scrollView.bounds)
+        let tbl = SidebarTableView(frame: scrollView.bounds)
         tbl.style = .sourceList
         tbl.headerView = nil
         tbl.rowHeight = 54
         tbl.backgroundColor = .clear
+        
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("SidebarColumn"))
+        col.resizingMask = .autoresizingMask
+        col.width = scrollView.contentSize.width
         tbl.addTableColumn(col)
+        tbl.sizeLastColumnToFit()
+        
         tbl.dataSource = self
         tbl.delegate = self
         tbl.target = self
         tbl.doubleAction = #selector(tableDoubleClicked)
+        
+        // Context Menu for right-click desktop experience
+        let menu = NSMenu()
+        let copyPathItem = NSMenuItem(title: "Copy Path for LLMs", action: #selector(contextCopyPath), keyEquivalent: "")
+        copyPathItem.image = NSImage(systemSymbolName: "link", accessibilityDescription: nil)
+        copyPathItem.target = self
+        menu.addItem(copyPathItem)
+        
+        let copyMp4Item = NSMenuItem(title: "Copy MP4", action: #selector(contextCopyMp4), keyEquivalent: "")
+        copyMp4Item.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+        copyMp4Item.target = self
+        menu.addItem(copyMp4Item)
+        
+        let copyGifItem = NSMenuItem(title: "Copy GIF", action: #selector(contextCopyGif), keyEquivalent: "")
+        copyGifItem.image = NSImage(systemSymbolName: "photo", accessibilityDescription: nil)
+        copyGifItem.target = self
+        menu.addItem(copyGifItem)
+        
+        let revealItem = NSMenuItem(title: "Reveal in Finder", action: #selector(contextReveal), keyEquivalent: "")
+        revealItem.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        revealItem.target = self
+        menu.addItem(revealItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        let deleteItem = NSMenuItem(title: "Delete Recording...", action: #selector(contextDelete), keyEquivalent: "")
+        deleteItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
+        deleteItem.target = self
+        menu.addItem(deleteItem)
+        
+        tbl.menu = menu
+        
         scrollView.documentView = tbl
         sidebar.addSubview(scrollView)
         self.tableView = tbl
@@ -551,10 +588,24 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
     }
     
     // MARK: - Actions
-    @objc private func copyPathClicked() {
-        guard let url = selectedRecordingURL else { return }
+    public func copyPath(at row: Int) {
+        guard row >= 0 && row < recordings.count else { return }
+        let url = recordings[row]
+        if selectedRecordingURL != url {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            selectedRecordingURL = url
+            updatePlayerAndDetails()
+        }
         PasteboardManager.shared.copyPathToPasteboard(fileURL: url)
         showFeedback(message: "✓ Copied file path for LLMs (⌘V)")
+    }
+    
+    @objc private func copyPathClicked() {
+        if let url = selectedRecordingURL, let row = recordings.firstIndex(of: url) {
+            copyPath(at: row)
+        } else if tableView.selectedRow >= 0 {
+            copyPath(at: tableView.selectedRow)
+        }
     }
     
     @objc private func copyMp4Clicked() {
@@ -586,8 +637,9 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     
-    @objc private func deleteClicked() {
-        guard let url = selectedRecordingURL else { return }
+    public func deleteRecording(at row: Int) {
+        guard row >= 0 && row < recordings.count else { return }
+        let url = recordings[row]
         let alert = NSAlert()
         alert.messageText = "Delete Recording?"
         alert.informativeText = "Are you sure you want to delete \"\(formattedDateTitle(for: url))\"?"
@@ -596,21 +648,45 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         alert.addButton(withTitle: "Cancel")
         
         if alert.runModal() == .alertFirstButtonReturn {
-            playerView.player?.pause()
-            playerView.player = nil
+            let wasSelected = (selectedRecordingURL == url)
+            if wasSelected {
+                playerView.player?.pause()
+                playerView.player = nil
+                selectedRecordingURL = nil
+            }
             
             try? FileManager.default.removeItem(at: url)
             let gifURL = url.deletingPathExtension().appendingPathExtension("gif")
             try? FileManager.default.removeItem(at: gifURL)
             
-            selectedRecordingURL = nil
             refreshRecordingsList()
-            if !recordings.isEmpty {
-                tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-                selectedRecordingURL = recordings.first
+            
+            if wasSelected {
+                if !recordings.isEmpty {
+                    let newIndex = min(row, recordings.count - 1)
+                    tableView.selectRowIndexes(IndexSet(integer: newIndex), byExtendingSelection: false)
+                    selectedRecordingURL = recordings[newIndex]
+                }
+            } else if let selURL = selectedRecordingURL, let newIndex = recordings.firstIndex(of: selURL) {
+                tableView.selectRowIndexes(IndexSet(integer: newIndex), byExtendingSelection: false)
             }
+            
             updatePlayerAndDetails()
             showFeedback(message: "Deleted recording", isAccent: false)
+        }
+    }
+    
+    public func deleteSelected() {
+        let row = tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        deleteRecording(at: row)
+    }
+    
+    @objc private func deleteClicked() {
+        if let url = selectedRecordingURL, let row = recordings.firstIndex(of: url) {
+            deleteRecording(at: row)
+        } else if tableView.selectedRow >= 0 {
+            deleteRecording(at: tableView.selectedRow)
         }
     }
     
@@ -622,6 +698,54 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         let row = tableView.clickedRow
         guard row >= 0 && row < recordings.count else { return }
         NSWorkspace.shared.open(recordings[row])
+    }
+    
+    // MARK: - Context Menu Actions
+    @objc private func contextCopyPath() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        copyPath(at: row)
+    }
+    
+    @objc private func contextCopyMp4() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        let url = recordings[row]
+        PasteboardManager.shared.copyFileToPasteboard(fileURL: url)
+        showFeedback(message: "✓ Copied MP4 file to clipboard")
+    }
+    
+    @objc private func contextCopyGif() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        let url = recordings[row]
+        showFeedback(message: "⏳ Converting to GIF...", isAccent: false)
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            if let gifURL = MediaPostProcessor.shared.generateGIF(from: url) {
+                PasteboardManager.shared.copyGIFToPasteboard(gifURL: gifURL)
+                DispatchQueue.main.async {
+                    self?.showFeedback(message: "✓ Copied GIF to clipboard")
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self?.showFeedback(message: "❌ GIF conversion failed", isAccent: false)
+                }
+            }
+        }
+    }
+    
+    @objc private func contextReveal() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        let url = recordings[row]
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+    
+    @objc private func contextDelete() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0 && row < recordings.count else { return }
+        deleteRecording(at: row)
     }
     
     // MARK: - NSTableViewDataSource & Delegate
@@ -655,6 +779,26 @@ public final class RecordingsWindowController: NSWindowController, NSTableViewDa
         guard row >= 0 && row < recordings.count else { return }
         selectedRecordingURL = recordings[row]
         updatePlayerAndDetails()
+    }
+    
+    // MARK: - NSTableViewDelegate Row Actions (Swipe Left / Trailing Edge)
+    public func tableView(_ tableView: NSTableView, rowActionsForRow row: Int, edge: NSTableView.RowActionEdge) -> [NSTableViewRowAction] {
+        guard edge == .trailing else { return [] }
+        guard row >= 0 && row < recordings.count else { return [] }
+        
+        let deleteAction = NSTableViewRowAction(style: .destructive, title: "Delete") { [weak self] _, row in
+            self?.deleteRecording(at: row)
+        }
+        deleteAction.image = NSImage(systemSymbolName: "trash", accessibilityDescription: "Delete")
+        deleteAction.backgroundColor = .systemRed
+        
+        let copyAction = NSTableViewRowAction(style: .regular, title: "Copy Path") { [weak self] _, row in
+            self?.copyPath(at: row)
+        }
+        copyAction.image = NSImage(systemSymbolName: "link", accessibilityDescription: "Copy Path")
+        copyAction.backgroundColor = .controlAccentColor
+        
+        return [deleteAction, copyAction]
     }
 }
 
@@ -752,6 +896,31 @@ final class SidebarRecordingCellView: NSTableCellView {
                 }
             }
         }
+    }
+}
+
+// MARK: - SidebarTableView (Handles right-click selection and keyboard delete)
+final class SidebarTableView: NSTableView {
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        let row = self.row(at: point)
+        if row >= 0 && row < numberOfRows {
+            if !isRowSelected(row) {
+                selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            }
+            return super.menu(for: event)
+        }
+        return nil
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 51 { // Delete / Backspace key
+            if let windowController = delegate as? RecordingsWindowController {
+                windowController.deleteSelected()
+                return
+            }
+        }
+        super.keyDown(with: event)
     }
 }
 
