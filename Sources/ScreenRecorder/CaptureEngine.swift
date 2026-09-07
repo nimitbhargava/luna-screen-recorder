@@ -225,24 +225,34 @@ public final class CaptureEngine: NSObject, SCStreamDelegate, SCStreamOutput {
         // Optimize with faststart & inject silent audio so web/Gemini accept it cleanly
         let finalURL = MediaPostProcessor.shared.remuxForWebCompatibility(inputURL: rawURL)
         
-        // Background extraction of Apple Vision keyframes and Audio transcription
-        Task.detached(priority: .userInitiated) {
-            let events = InteractionTracker.shared.getEvents()
+        // Transcribe audio immediately so prompt.md and clipboard have the transcript ready
+        let transcript = await AudioTranscriber.shared.transcribeAudio(from: finalURL)
+        let events = InteractionTracker.shared.getEvents()
+        let initialPrompt = InteractionTracker.shared.generatePromptMarkdown(
+            videoURL: finalURL,
+            events: events,
+            speechTranscript: transcript
+        )
+        let promptURL = finalURL.deletingPathExtension().appendingPathExtension("prompt.md")
+        try? initialPrompt.data(using: .utf8)?.write(to: promptURL)
+        print("[CaptureEngine] Prompt generated with transcript: \"\(transcript ?? "none")\"")
+        
+        // Background extraction of Apple Vision keyframes to enrich the prompt further
+        Task.detached(priority: .utility) {
             let keyframes = await KeyframeExtractor.shared.extractKeyframes(videoURL: finalURL, events: events)
-            let transcript = await AudioTranscriber.shared.transcribeAudio(from: finalURL)
-            let richPrompt = InteractionTracker.shared.generatePromptMarkdown(
-                videoURL: finalURL,
-                events: events,
-                keyframePaths: keyframes.map { $0.path },
-                speechTranscript: transcript
-            )
-            let promptURL = finalURL.deletingPathExtension().appendingPathExtension("prompt.md")
-            try? richPrompt.data(using: .utf8)?.write(to: promptURL)
-            print("[CaptureEngine] Enriched prompt generated with \(keyframes.count) keyframes")
-            
-            if RetentionManager.shared.isAutoCopyPathEnabled {
-                await MainActor.run {
-                    PasteboardManager.shared.copyAIPromptToPasteboard(fileURL: finalURL)
+            if !keyframes.isEmpty {
+                let enrichedPrompt = InteractionTracker.shared.generatePromptMarkdown(
+                    videoURL: finalURL,
+                    events: events,
+                    keyframePaths: keyframes.map { $0.path },
+                    speechTranscript: transcript
+                )
+                try? enrichedPrompt.data(using: .utf8)?.write(to: promptURL)
+                print("[CaptureEngine] Enriched prompt updated with \(keyframes.count) keyframes")
+                if RetentionManager.shared.isAutoCopyPathEnabled {
+                    await MainActor.run {
+                        PasteboardManager.shared.copyAIPromptToPasteboard(fileURL: finalURL)
+                    }
                 }
             }
         }

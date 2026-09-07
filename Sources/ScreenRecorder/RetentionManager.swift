@@ -3,7 +3,7 @@ import Foundation
 public final class RetentionManager {
     public static let shared = RetentionManager()
     
-    public let recordingsDirectory: URL
+    public var recordingsDirectory: URL
     
     public static let autoDeleteDidChangeNotification = Notification.Name("LunaAutoDeleteDidChangeNotification")
     public static let autoCopyPathDidChangeNotification = Notification.Name("LunaAutoCopyPathDidChangeNotification")
@@ -70,43 +70,137 @@ public final class RetentionManager {
         }
     }
     
-    @discardableResult
-    public func pruneOldRecordings() -> Int {
-        guard isAutoDeleteEnabled else {
-            print("[RetentionManager] Auto-delete is disabled. Keeping all recordings.")
-            return 0
+    public struct StorageAnalysis {
+        public let totalRecordingsCount: Int
+        public let totalSizeBytes: Int64
+        public let eligibleCount: Int
+        public let eligibleSizeBytes: Int64
+        public let retentionDays: Int
+        
+        public var formattedTotalSize: String {
+            let bcf = ByteCountFormatter()
+            bcf.allowedUnits = [.useAll]
+            bcf.countStyle = .file
+            return bcf.string(fromByteCount: totalSizeBytes)
         }
         
+        public var formattedEligibleSize: String {
+            let bcf = ByteCountFormatter()
+            bcf.allowedUnits = [.useAll]
+            bcf.countStyle = .file
+            return bcf.string(fromByteCount: eligibleSizeBytes)
+        }
+    }
+    
+    public func analyzeStorage(forDays days: Int? = nil) -> StorageAnalysis {
         ensureDirectoryExists()
+        let targetDays = days ?? retentionDays
+        let cutoffDate = Date().addingTimeInterval(-Double(targetDays) * 86400)
         let fileManager = FileManager.default
         guard let items = try? fileManager.contentsOfDirectory(
             at: recordingsDirectory,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
             options: .skipsHiddenFiles
         ) else {
-            return 0
+            return StorageAnalysis(totalRecordingsCount: 0, totalSizeBytes: 0, eligibleCount: 0, eligibleSizeBytes: 0, retentionDays: targetDays)
         }
         
-        let cutoffDate = Date().addingTimeInterval(-Double(retentionDays) * 86400)
-        var prunedCount = 0
+        var totalCount = 0
+        var totalBytes: Int64 = 0
+        var eligibleCount = 0
+        var eligibleBytes: Int64 = 0
         
         for item in items {
-            guard item.pathExtension.lowercased() == "mp4" || item.pathExtension.lowercased() == "mov" || item.pathExtension.lowercased() == "gif" else {
-                continue
+            guard item.pathExtension.lowercased() == "mp4" else { continue }
+            totalCount += 1
+            let size = Int64((try? item.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            totalBytes += size
+            
+            // Also add size of auxiliary files
+            let base = item.deletingPathExtension()
+            for ext in ["gif", "prompt.md", "events.json"] {
+                let aux = base.appendingPathExtension(ext)
+                if let s = (try? aux.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                    totalBytes += Int64(s)
+                }
             }
-            if let values = try? item.resourceValues(forKeys: [.contentModificationDateKey]),
-               let modDate = values.contentModificationDate,
+            
+            if let modDate = (try? item.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
                modDate < cutoffDate {
-                do {
-                    try fileManager.removeItem(at: item)
-                    prunedCount += 1
-                    print("[RetentionManager] Pruned old recording: \(item.lastPathComponent)")
-                } catch {
-                    print("[RetentionManager] Failed to prune \(item.lastPathComponent): \(error)")
+                eligibleCount += 1
+                eligibleBytes += size
+                for ext in ["gif", "prompt.md", "events.json"] {
+                    let aux = base.appendingPathExtension(ext)
+                    if let s = (try? aux.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                        eligibleBytes += Int64(s)
+                    }
                 }
             }
         }
-        return prunedCount
+        
+        return StorageAnalysis(
+            totalRecordingsCount: totalCount,
+            totalSizeBytes: totalBytes,
+            eligibleCount: eligibleCount,
+            eligibleSizeBytes: eligibleBytes,
+            retentionDays: targetDays
+        )
+    }
+    
+    @discardableResult
+    public func pruneRecordingsOlderThan(days: Int) -> (count: Int, freedBytes: Int64) {
+        ensureDirectoryExists()
+        let cutoffDate = Date().addingTimeInterval(-Double(days) * 86400)
+        let fileManager = FileManager.default
+        guard let items = try? fileManager.contentsOfDirectory(
+            at: recordingsDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: .skipsHiddenFiles
+        ) else {
+            return (0, 0)
+        }
+        
+        var prunedCount = 0
+        var freedBytes: Int64 = 0
+        
+        for item in items {
+            guard item.pathExtension.lowercased() == "mp4" else { continue }
+            if let values = try? item.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+               let modDate = values.contentModificationDate,
+               modDate < cutoffDate {
+                let size = Int64(values.fileSize ?? 0)
+                freedBytes += size
+                deleteRecordingAndAuxiliaries(for: item)
+                prunedCount += 1
+                print("[RetentionManager] Pruned recording and assets: \(item.lastPathComponent)")
+            }
+        }
+        return (prunedCount, freedBytes)
+    }
+    
+    public func deleteRecordingAndAuxiliaries(for videoURL: URL) {
+        let fileManager = FileManager.default
+        try? fileManager.removeItem(at: videoURL)
+        
+        let base = videoURL.deletingPathExtension()
+        let auxFiles = [
+            base.appendingPathExtension("gif"),
+            base.appendingPathExtension("prompt.md"),
+            base.appendingPathExtension("events.json"),
+            base.appendingPathExtension("keyframes")
+        ]
+        for aux in auxFiles {
+            try? fileManager.removeItem(at: aux)
+        }
+    }
+    
+    @discardableResult
+    public func pruneOldRecordings() -> Int {
+        guard isAutoDeleteEnabled else {
+            print("[RetentionManager] Auto-delete is disabled. Keeping all recordings.")
+            return 0
+        }
+        return pruneRecordingsOlderThan(days: retentionDays).count
     }
     
     public func generateOutputFileURL(prefix: String = "Recording") -> URL {
