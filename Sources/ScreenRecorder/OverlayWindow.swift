@@ -2,7 +2,7 @@ import AppKit
 import ScreenCaptureKit
 
 public final class OverlayWindowController: NSWindowController {
-    public typealias SelectionHandler = (SCDisplay, CGRect) -> Void
+    public typealias SelectionHandler = (CaptureTarget) -> Void
     
     private var selectionHandler: SelectionHandler?
     private var overlayWindows: [NSWindow] = []
@@ -14,48 +14,57 @@ public final class OverlayWindowController: NSWindowController {
         dismissAll()
         
         Task { @MainActor in
-            guard let content = try? await CaptureEngine.fetchShareableContent(),
-                  let mainDisplay = content.displays.first else {
-                print("[OverlayWindow] Failed to fetch displays for overlay")
-                return
-            }
-            
-            for screen in NSScreen.screens {
-                let window = NSWindow(
-                    contentRect: screen.frame,
-                    styleMask: [.borderless],
-                    backing: .buffered,
-                    defer: false
-                )
-                window.level = .floating
-                window.backgroundColor = .clear
-                window.isOpaque = false
-                window.hasShadow = false
-                window.ignoresMouseEvents = false
-                
-                // Find matching SCDisplay (or default to main)
-                let matchingDisplay = content.displays.first(where: {
-                    // Match display by ID or origin
-                    abs($0.frame.origin.x - screen.frame.origin.x) < 5
-                }) ?? mainDisplay
-                
-                let overlayView = OverlaySelectionView(
-                    frame: NSRect(origin: .zero, size: screen.frame.size),
-                    screenFrame: screen.frame,
-                    display: matchingDisplay
-                ) { [weak self] display, rect in
-                    self?.dismissAll()
-                    self?.selectionHandler?(display, rect)
-                } onCancel: { [weak self] in
-                    self?.dismissAll()
+            do {
+                let content = try await CaptureEngine.fetchShareableContent()
+                guard let mainDisplay = content.displays.first else {
+                    print("[OverlayWindow] Failed to fetch displays for overlay")
+                    return
                 }
                 
-                window.contentView = overlayView
-                window.makeKeyAndOrderFront(nil)
-                overlayWindows.append(window)
+                for screen in NSScreen.screens {
+                    let window = NSWindow(
+                        contentRect: screen.frame,
+                        styleMask: [.borderless],
+                        backing: .buffered,
+                        defer: false
+                    )
+                    window.level = .floating
+                    window.backgroundColor = .clear
+                    window.isOpaque = false
+                    window.hasShadow = false
+                    window.ignoresMouseEvents = false
+                    
+                    // Match SCDisplay by CGDirectDisplayID or coordinate proximity
+                    let screenNum = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+                    let matchingDisplay = content.displays.first(where: {
+                        if let screenNum = screenNum, $0.displayID == screenNum { return true }
+                        return abs($0.frame.origin.x - screen.frame.origin.x) < 5
+                    }) ?? mainDisplay
+                    
+                    let overlayView = OverlaySelectionView(
+                        frame: NSRect(origin: .zero, size: screen.frame.size),
+                        screenFrame: screen.frame,
+                        display: matchingDisplay
+                    ) { [weak self] target in
+                        self?.dismissAll()
+                        self?.selectionHandler?(target)
+                    } onCancel: { [weak self] in
+                        self?.dismissAll()
+                    }
+                    
+                    window.contentView = overlayView
+                    window.makeKeyAndOrderFront(nil)
+                    self.overlayWindows.append(window)
+                }
+                
+                NSApp.activate(ignoringOtherApps: true)
+            } catch {
+                print("[OverlayWindow] Failed to fetch shareable content: \(error)")
+                let nsError = error as NSError
+                if nsError.code == -3801 || nsError.domain.contains("ScreenCaptureKit") {
+                    PermissionManager.shared.showPermissionAlert()
+                }
             }
-            
-            NSApp.activate(ignoringOtherApps: true)
         }
     }
     
@@ -70,13 +79,13 @@ public final class OverlayWindowController: NSWindowController {
 private final class OverlaySelectionView: NSView {
     private let screenFrame: CGRect
     private let display: SCDisplay
-    private let onSelect: (SCDisplay, CGRect) -> Void
+    private let onSelect: (CaptureTarget) -> Void
     private let onCancel: () -> Void
     
     private var startPoint: CGPoint?
     private var currentPoint: CGPoint?
     
-    init(frame: NSRect, screenFrame: CGRect, display: SCDisplay, onSelect: @escaping (SCDisplay, CGRect) -> Void, onCancel: @escaping () -> Void) {
+    init(frame: NSRect, screenFrame: CGRect, display: SCDisplay, onSelect: @escaping (CaptureTarget) -> Void, onCancel: @escaping () -> Void) {
         self.screenFrame = screenFrame
         self.display = display
         self.onSelect = onSelect
@@ -149,7 +158,7 @@ private final class OverlaySelectionView: NSView {
         }
         
         // Draw instructions at top
-        let tipText = "Drag to select area • Release to record • Esc to cancel"
+        let tipText = "Drag to select area • Click to record this screen • Esc to cancel"
         let tipAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13, weight: .medium),
             .foregroundColor: NSColor.white
@@ -179,6 +188,20 @@ private final class OverlaySelectionView: NSView {
     }
     
     override func mouseUp(with event: NSEvent) {
+        // If the user simply clicked or barely dragged (< 15pt), treat as selecting the entire display
+        let isClick: Bool
+        if let rect = selectionRect {
+            isClick = (rect.width < 15 && rect.height < 15)
+        } else {
+            isClick = true
+        }
+        
+        if isClick {
+            print("[OverlayWindow] User clicked screen \(display.displayID): recording entire screen")
+            onSelect(.display(display))
+            return
+        }
+        
         guard let rect = selectionRect, rect.width >= 20 && rect.height >= 20 else {
             startPoint = nil
             currentPoint = nil
@@ -192,7 +215,7 @@ private final class OverlaySelectionView: NSView {
         let sckX = rect.origin.x
         let sckRect = CGRect(x: max(0, sckX), y: max(0, sckY), width: rect.width, height: rect.height)
         
-        onSelect(display, sckRect)
+        onSelect(.area(display: display, rect: sckRect))
     }
     
     override func keyDown(with event: NSEvent) {

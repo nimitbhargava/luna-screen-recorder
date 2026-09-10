@@ -170,9 +170,9 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         hotkeyBox.borderWidth = 1.0
         
         let shortcuts: [(String, String)] = [
-            ("⌘⌥1", "Record Area Crop (drag to select)"),
+            ("⌘⌥1", "Record Area Crop (or click screen for full display)"),
             ("⌘⌥2", "Choose Window or Display"),
-            ("⌘⌥3", "Record Entire Display"),
+            ("⌘⌥3", "Record Active Screen / Entire Display"),
             ("⌘⌥S", "Stop Recording (or click floating HUD)")
         ]
         

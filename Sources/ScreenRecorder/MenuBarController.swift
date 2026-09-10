@@ -16,6 +16,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private var visualPickerMenuItem: NSMenuItem!
     private var recordWindowMenuItem: NSMenuItem!
     private var recordScreenMenuItem: NSMenuItem!
+    private var recordSpecificScreenMenuItem: NSMenuItem!
+    private var screenSubmenu: NSMenu!
     private var startSectionSeparator: NSMenuItem!
     private var recordingSectionSeparator: NSMenuItem!
     private var autoDeleteToggleItem: NSMenuItem!
@@ -155,21 +157,27 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         recordAreaMenuItem.image = NSImage(systemSymbolName: "crop", accessibilityDescription: nil)
         menu.addItem(recordAreaMenuItem)
         
-        visualPickerMenuItem = NSMenuItem(title: "Choose Window / Screen... (⌘⌥2)", action: #selector(showVisualPicker), keyEquivalent: "")
-        visualPickerMenuItem.target = self
-        visualPickerMenuItem.image = NSImage(systemSymbolName: "macwindow.on.rectangle", accessibilityDescription: nil)
-        menu.addItem(visualPickerMenuItem)
-        
-        recordWindowMenuItem = NSMenuItem(title: "Quick Window List", action: nil, keyEquivalent: "")
-        recordWindowMenuItem.image = NSImage(systemSymbolName: "uiwindow.split.2x1", accessibilityDescription: nil)
-        windowSubmenu = NSMenu()
-        recordWindowMenuItem.submenu = windowSubmenu
-        menu.addItem(recordWindowMenuItem)
-        
         recordScreenMenuItem = NSMenuItem(title: "Record Entire Screen (⌘⌥3)", action: #selector(startMainScreenRecording), keyEquivalent: "")
         recordScreenMenuItem.target = self
         recordScreenMenuItem.image = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
         menu.addItem(recordScreenMenuItem)
+        
+        recordSpecificScreenMenuItem = NSMenuItem(title: "Record Specific Screen", action: nil, keyEquivalent: "")
+        recordSpecificScreenMenuItem.image = NSImage(systemSymbolName: "display.2", accessibilityDescription: nil)
+        screenSubmenu = NSMenu()
+        recordSpecificScreenMenuItem.submenu = screenSubmenu
+        menu.addItem(recordSpecificScreenMenuItem)
+        
+        recordWindowMenuItem = NSMenuItem(title: "Record Window", action: nil, keyEquivalent: "")
+        recordWindowMenuItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
+        windowSubmenu = NSMenu()
+        recordWindowMenuItem.submenu = windowSubmenu
+        menu.addItem(recordWindowMenuItem)
+        
+        visualPickerMenuItem = NSMenuItem(title: "Choose Window / Screen... (⌘⌥2)", action: #selector(showVisualPicker), keyEquivalent: "")
+        visualPickerMenuItem.target = self
+        visualPickerMenuItem.image = NSImage(systemSymbolName: "macwindow.on.rectangle", accessibilityDescription: nil)
+        menu.addItem(visualPickerMenuItem)
         
         startSectionSeparator = NSMenuItem.separator()
         menu.addItem(startSectionSeparator)
@@ -247,9 +255,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         recordingSectionSeparator.isHidden = !isRecording
         
         recordAreaMenuItem.isHidden = isRecording
-        visualPickerMenuItem.isHidden = isRecording
-        recordWindowMenuItem.isHidden = isRecording
         recordScreenMenuItem.isHidden = isRecording
+        recordSpecificScreenMenuItem.isHidden = isRecording
+        recordWindowMenuItem.isHidden = isRecording
+        visualPickerMenuItem.isHidden = isRecording
         startSectionSeparator.isHidden = isRecording
         
         autoDeleteToggleItem.state = RetentionManager.shared.isAutoDeleteEnabled ? .on : .off
@@ -279,50 +288,137 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
         
         recordAreaMenuItem.isEnabled = true
-        visualPickerMenuItem.isEnabled = true
-        recordWindowMenuItem.isEnabled = true
         recordScreenMenuItem.isEnabled = true
+        recordSpecificScreenMenuItem.isEnabled = true
+        recordWindowMenuItem.isEnabled = true
+        visualPickerMenuItem.isEnabled = true
         
         Task { @MainActor in
-            guard let content = try? await CaptureEngine.fetchShareableContent() else { return }
-            
-            // Refresh Windows
-            self.windowSubmenu.removeAllItems()
-            let filteredWindows = content.windows.filter { window in
-                guard let app = window.owningApplication else { return false }
-                guard window.frame.width > 100 && window.frame.height > 100 else { return false }
-                guard app.applicationName != "ScreenRecorder" else { return false }
-                guard !["Window Server", "Dock", "SystemUIServer", "Control Center"].contains(app.applicationName) else { return false }
-                return true
-            }
-            
-            for window in filteredWindows.prefix(25) {
-                let appName = window.owningApplication?.applicationName ?? "Unknown"
-                let title = (window.title?.isEmpty ?? true) ? "Untitled Window" : (window.title ?? "")
-                let truncatedTitle = title.count > 35 ? "\(title.prefix(32))..." : title
+            do {
+                let content = try await CaptureEngine.fetchShareableContent()
                 
-                let item = NSMenuItem(
-                    title: "\(appName): \(truncatedTitle)",
-                    action: #selector(self.windowSelected(_:)),
-                    keyEquivalent: ""
-                )
-                item.representedObject = window
-                item.target = self
-                self.windowSubmenu.addItem(item)
-            }
-            
-            if filteredWindows.isEmpty {
-                let emptyItem = NSMenuItem(title: "No visible windows found", action: nil, keyEquivalent: "")
-                emptyItem.isEnabled = false
-                self.windowSubmenu.addItem(emptyItem)
+                // Helper to resolve localized display name
+                func displayName(for display: SCDisplay) -> String {
+                    for screen in NSScreen.screens {
+                        let screenNum = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+                        if screenNum == display.displayID {
+                            return screen.localizedName
+                        }
+                    }
+                    return "Display \(display.displayID)"
+                }
+                
+                // --- 1. Refresh Screens / Displays ---
+                self.screenSubmenu.removeAllItems()
+                let displays = content.displays
+                let mouseLoc = NSEvent.mouseLocation
+                
+                // Update top "Record Entire Screen" menu title
+                if displays.count == 1, let single = displays.first {
+                    let name = displayName(for: single)
+                    self.recordScreenMenuItem.title = "Record Entire Screen (\(name)) (⌘⌥3)"
+                } else {
+                    self.recordScreenMenuItem.title = "Record Entire Screen (Active Display) (⌘⌥3)"
+                }
+                
+                for (index, display) in displays.enumerated() {
+                    let name = displayName(for: display)
+                    var badges: [String] = []
+                    if index == 0 { badges.append("Main") }
+                    
+                    var isActive = false
+                    for screen in NSScreen.screens {
+                        let screenNum = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+                        if screenNum == display.displayID && NSMouseInRect(mouseLoc, screen.frame, false) {
+                            isActive = true
+                            break
+                        }
+                    }
+                    if isActive { badges.append("Active") }
+                    
+                    let badgeStr = badges.isEmpty ? "" : " [\(badges.joined(separator: ", "))]"
+                    let itemTitle = "\(name) (\(display.width) × \(display.height))\(badgeStr)"
+                    let item = NSMenuItem(
+                        title: itemTitle,
+                        action: #selector(self.displaySelected(_:)),
+                        keyEquivalent: ""
+                    )
+                    item.image = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
+                    item.representedObject = display
+                    item.target = self
+                    self.screenSubmenu.addItem(item)
+                }
+                
+                if displays.count > 1 {
+                    self.screenSubmenu.addItem(NSMenuItem.separator())
+                    let activeItem = NSMenuItem(
+                        title: "Record Active Screen (Under Mouse Cursor) (⌘⌥3)",
+                        action: #selector(self.startMainScreenRecording),
+                        keyEquivalent: ""
+                    )
+                    activeItem.image = NSImage(systemSymbolName: "cursorarrow.rays", accessibilityDescription: nil)
+                    activeItem.target = self
+                    self.screenSubmenu.addItem(activeItem)
+                }
+                
+                if displays.isEmpty {
+                    let emptyItem = NSMenuItem(title: "No displays detected", action: nil, keyEquivalent: "")
+                    emptyItem.isEnabled = false
+                    self.screenSubmenu.addItem(emptyItem)
+                }
+                
+                // --- 2. Refresh Windows ---
+                self.windowSubmenu.removeAllItems()
+                let filteredWindows = content.windows.filter { window in
+                    guard let app = window.owningApplication else { return false }
+                    guard window.frame.width > 100 && window.frame.height > 100 else { return false }
+                    guard app.applicationName != "ScreenRecorder" && app.applicationName != "Luna" else { return false }
+                    guard !["Window Server", "Dock", "SystemUIServer", "Control Center"].contains(app.applicationName) else { return false }
+                    return true
+                }
+                
+                for window in filteredWindows.prefix(25) {
+                    let appName = window.owningApplication?.applicationName ?? "Unknown"
+                    let title = (window.title?.isEmpty ?? true) ? "Untitled Window" : (window.title ?? "")
+                    let truncatedTitle = title.count > 35 ? "\(title.prefix(32))..." : title
+                    
+                    let item = NSMenuItem(
+                        title: "\(appName): \(truncatedTitle)",
+                        action: #selector(self.windowSelected(_:)),
+                        keyEquivalent: ""
+                    )
+                    item.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
+                    item.representedObject = window
+                    item.target = self
+                    self.windowSubmenu.addItem(item)
+                }
+                
+                if filteredWindows.isEmpty {
+                    let emptyItem = NSMenuItem(title: "No visible windows found", action: nil, keyEquivalent: "")
+                    emptyItem.isEnabled = false
+                    self.windowSubmenu.addItem(emptyItem)
+                }
+            } catch {
+                print("[MenuBarController] refreshDynamicMenus content error: \(error)")
+                let nsError = error as NSError
+                if nsError.code == -3801 || nsError.domain.contains("ScreenCaptureKit") {
+                    self.screenSubmenu.removeAllItems()
+                    let permItem = NSMenuItem(
+                        title: "⚠️ Screen Recording Permission Required...",
+                        action: #selector(self.openPermissionSettings),
+                        keyEquivalent: ""
+                    )
+                    permItem.target = self
+                    self.screenSubmenu.addItem(permItem)
+                }
             }
         }
     }
     
     @objc public func startAreaRecording() {
         guard !CaptureEngine.shared.isRecording else { return }
-        OverlayWindowController.shared.startSelection { [weak self] display, rect in
-            self?.beginRecording(target: .area(display: display, rect: rect))
+        OverlayWindowController.shared.startSelection { [weak self] target in
+            self?.beginRecording(target: target)
         }
     }
     
@@ -342,16 +438,35 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             do {
                 let content = try await CaptureEngine.fetchShareableContent()
                 print("[MenuBarController] Fetched shareable content: \(content.displays.count) displays")
-                guard let mainDisplay = content.displays.first else {
+                guard !content.displays.isEmpty else {
                     print("[MenuBarController] No display found in shareable content")
-                    showErrorNotification(message: "Failed to access display for recording")
+                    self.showErrorAlert(title: "No Display Found", message: "Failed to access any display for recording.")
                     return
                 }
-                print("[MenuBarController] Starting recording on display: \(mainDisplay.displayID)")
-                self.beginRecording(target: .display(mainDisplay))
+                
+                // Pick display under mouse cursor, or default to first display
+                let mouseLoc = NSEvent.mouseLocation
+                var targetDisplay = content.displays.first!
+                for screen in NSScreen.screens {
+                    if NSMouseInRect(mouseLoc, screen.frame, false) {
+                        let screenNum = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+                        if let matched = content.displays.first(where: { $0.displayID == screenNum }) {
+                            targetDisplay = matched
+                            break
+                        }
+                    }
+                }
+                
+                print("[MenuBarController] Starting recording on display: \(targetDisplay.displayID)")
+                self.beginRecording(target: .display(targetDisplay))
             } catch {
                 print("[MenuBarController] Failed to fetch shareable content: \(error)")
-                showErrorNotification(message: "Failed to access display: \(error.localizedDescription)")
+                let nsError = error as NSError
+                if nsError.code == -3801 || nsError.domain.contains("ScreenCaptureKit") {
+                    PermissionManager.shared.showPermissionAlert()
+                } else {
+                    self.showErrorAlert(title: "Display Capture Error", message: error.localizedDescription)
+                }
             }
         }
     }
@@ -392,7 +507,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 )
             } catch {
                 print("[MenuBarController] Failed to start capture (filter): \(error)")
-                showErrorNotification(message: "Failed to start capture: \(error.localizedDescription)")
+                let nsError = error as NSError
+                if nsError.code == -3801 || nsError.domain.contains("ScreenCaptureKit") {
+                    PermissionManager.shared.showPermissionAlert()
+                } else {
+                    self.showErrorAlert(title: "Failed to Start Recording", message: error.localizedDescription)
+                }
             }
         }
     }
@@ -419,7 +539,12 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 )
             } catch {
                 print("[MenuBarController] Failed to start capture (target): \(error)")
-                showErrorNotification(message: "Failed to start capture: \(error.localizedDescription)")
+                let nsError = error as NSError
+                if nsError.code == -3801 || nsError.domain.contains("ScreenCaptureKit") {
+                    PermissionManager.shared.showPermissionAlert()
+                } else {
+                    self.showErrorAlert(title: "Failed to Start Recording", message: error.localizedDescription)
+                }
             }
         }
     }
@@ -579,15 +704,28 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
     
-    private func showErrorNotification(message: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "Recording Error"
-        content.body = message
-        content.sound = .default
-        
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        if Bundle.main.bundleIdentifier != nil {
-            UNUserNotificationCenter.current().add(request)
+    @objc public func openPermissionSettings() {
+        PermissionManager.openScreenRecordingSettings()
+    }
+    
+    public func showErrorAlert(title: String, message: String) {
+        DispatchQueue.main.async {
+            let nsStr = message as NSString
+            if nsStr.contains("-3801") || nsStr.contains("declined TCC") {
+                PermissionManager.shared.showPermissionAlert()
+                return
+            }
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
         }
+    }
+    
+    private func showErrorNotification(message: String) {
+        showErrorAlert(title: "Recording Error", message: message)
     }
 }
