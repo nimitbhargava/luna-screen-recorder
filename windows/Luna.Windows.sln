@@ -1,0 +1,28 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Luna.Core", "src\Luna.Core\Luna.Core.csproj", "{41264DBC-3975-4CEB-A748-AC4577C6C5DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Luna.App", "src\Luna.App\Luna.App.csproj", "{D24747C7-0C5B-493D-AA7B-74384B6A8474}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Luna.Core.Tests", "tests\Luna.Core.Tests\Luna.Core.Tests.csproj", "{6D9F6277-2452-4C31-B009-1D328DCCFA10}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{41264DBC-3975-4CEB-A748-AC4577C6C5DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41264DBC-3975-4CEB-A748-AC4577C6C5DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41264DBC-3975-4CEB-A748-AC4577C6C5DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41264DBC-3975-4CEB-A748-AC4577C6C5DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D24747C7-0C5B-493D-AA7B-74384B6A8474}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{D24747C7-0C5B-493D-AA7B-74384B6A8474}.Debug|Any CPU.Build.0 = Debug|x64
+		{D24747C7-0C5B-493D-AA7B-74384B6A8474}.Release|Any CPU.ActiveCfg = Release|x64
+		{D24747C7-0C5B-493D-AA7B-74384B6A8474}.Release|Any CPU.Build.0 = Release|x64
+		{6D9F6277-2452-4C31-B009-1D328DCCFA10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D9F6277-2452-4C31-B009-1D328DCCFA10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D9F6277-2452-4C31-B009-1D328DCCFA10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D9F6277-2452-4C31-B009-1D328DCCFA10}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

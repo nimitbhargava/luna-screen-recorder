@@ -108,3 +108,7 @@ We welcome feedback and feature ideas! **Please read [`CONTRIBUTING.md`](./CONTR
 ## 💖 Credits & Acknowledgements
 
 The name and mascot are an affectionate homage to **Luna**, the iconic crescent-moon-marked guardian cat from ***Sailor Moon***, created by **Naoko Takeuchi** and produced by **Toei Animation**. All rights and credits to the character belong to their respective creators.
+
+## Windows
+
+The Windows preview for issue #1 includes recording, Library and settings. See [Windows build, testing instructions and known limits](windows/README.md).

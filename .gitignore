@@ -15,6 +15,9 @@ xcuserdata/
 
 # App Bundles
 *.app/
+# Keep the Windows WPF project when Git uses case-insensitive matching.
+!windows/src/Luna.App/
+!windows/src/Luna.App/**
 
 # Recordings and Media
 *.mp4
@@ -34,3 +37,9 @@ site/video/out/
 !site/media/luna-demo.mp4
 !site/media/luna-demo-vi.mp4
 presenter/.wrangler/
+
+# Windows build outputs
+/.artifacts/
+windows/**/bin/
+windows/**/obj/
+windows/artifacts/
